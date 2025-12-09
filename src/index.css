@@ -1,0 +1,61 @@
+@import 'bpmn-js/dist/assets/diagram-js.css';
+@import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-hb-paper text-hb-ink font-sans antialiased selection:bg-black selection:text-white;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight font-medium;
+  }
+}
+
+@layer components {
+  .hb-btn {
+    @apply border border-hb-line bg-white px-6 py-2 text-sm font-medium hover:border-hb-ink transition-colors duration-200 uppercase tracking-wider text-hb-ink;
+  }
+  
+  .hb-btn-primary {
+    @apply border border-hb-ink bg-hb-ink text-white px-6 py-2 text-sm font-medium hover:bg-white hover:text-hb-ink transition-colors duration-200 uppercase tracking-wider;
+  }
+
+  .hb-btn-secondary {
+    @apply border border-hb-line bg-transparent px-6 py-2 text-sm font-medium hover:border-hb-ink transition-colors duration-200 uppercase tracking-wider text-hb-ink;
+  }
+
+  .hb-input {
+    @apply w-full bg-transparent border-b border-hb-line py-3 text-hb-ink placeholder-hb-gray/40 focus:outline-none focus:border-hb-ink transition-colors font-light;
+  }
+
+  .hb-card {
+    @apply bg-white border border-hb-line p-8 relative;
+  }
+
+  .hb-table-header {
+    @apply text-xs uppercase tracking-widest text-hb-gray font-medium border-b border-hb-line pb-4;
+  }
+
+  .hb-table-cell {
+    @apply py-4 border-b border-hb-line text-sm font-light text-hb-ink;
+  }
+
+  /* Editorial Grid Lines */
+  .grid-lines {
+    background-image: linear-gradient(to right, #E0E0E0 1px, transparent 1px);
+    background-size: 25% 100%; /* 4 columns */
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
