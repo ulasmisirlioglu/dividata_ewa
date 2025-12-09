@@ -1,15 +1,15 @@
 {
   "name": "dividata-ewa",
   "private": true,
-  "version": "0.0.3",
+  "version": "0.0.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx vite build",
+    "build": "vite build",
     "type-check": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npx serve -s dist"
+    "start": "serve -s dist"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
