@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
@@ -18,7 +18,12 @@ export const AnalogProcess: React.FC = () => {
   } = useStore();
   const { t } = useLangStore();
 
-  const [currentStep, setCurrentStep] = useState(1); 
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [currentStep]); 
 
   const handleNext = () => {
     if (currentStep < 3) {
