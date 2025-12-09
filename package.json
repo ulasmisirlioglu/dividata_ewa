@@ -1,7 +1,7 @@
 {
   "name": "dividata-ewa",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,6 +23,7 @@
     "recharts": "^2.14.1",
     "serve": "^14.2.5",
     "tailwind-merge": "^2.5.5",
+    "typescript": "^5.6.2",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
@@ -32,7 +33,6 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.16",
-    "typescript": "~5.6.2",
     "vite": "^6.0.1"
   }
 }
