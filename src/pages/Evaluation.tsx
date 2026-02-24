@@ -12,7 +12,7 @@ export const Evaluation: React.FC = () => {
   const { t } = useLangStore();
 
   const handleNext = () => {
-    navigate('/results');
+    navigate('/digitalization-costs');
   };
 
   const handleBack = () => {
@@ -132,7 +132,7 @@ export const Evaluation: React.FC = () => {
             onClick={handleNext}
             className="hb-btn-primary flex items-center shadow-lg shadow-black/5"
           >
-            {t.calculateRoi}
+            {t.nextStep}
             <ArrowRight size={20} className="ml-2" />
           </button>
         </div>

@@ -4,21 +4,41 @@ type Language = 'de' | 'en';
 
 interface Translation {
   // Navigation
-  navStart: string;
+  navDashboard: string;
   navAnalog: string;
   navEvaluation: string;
+  navCosts: string;
   navResults: string;
-  
-  // Onboarding
+
+  // Auth
+  authSignIn: string;
+  authSignUp: string;
+  authStadtnameLabel: string;
+  authStadtnamePlaceholder: string;
+  authPasswordLabel: string;
+  authConfirmPasswordLabel: string;
+  authPasswordMismatch: string;
+  authSignInAction: string;
+  authSignUpAction: string;
+  authSignOutAction: string;
   heroTitle: string;
   heroSubtitle: string;
-  municipalityLabel: string;
-  municipalityPlaceholder: string;
-  useCaseLabel: string;
-  startMapping: string;
+
+  // Dashboard
+  dashboardLabel: string;
+  dashboardWelcome: string;
+  dashboardSubtitle: string;
+  dashboardNewUseCase: string;
+  dashboardEwaDesc: string;
+  dashboardComingSoon: string;
+  dashboardMoreUseCases: string;
+  dashboardPreviousProjects: string;
+  dashboardNoProjects: string;
+  dashboardLoading: string;
 
   // Analog Process
   mapProcessTitle: string;
+  mapProcessHeading: string;
   mapProcessDesc: string;
   stepDurationsTitle: string;
   stepDurationsDesc: string;
@@ -53,6 +73,23 @@ interface Translation {
   calculateRoi: string;
   figure30: string;
 
+  // Digitalization Costs
+  costsTitle: string;
+  costsDesc: string;
+  licenseCostYear: string;
+  implementationCost: string;
+  trainingCost: string;
+  maintenanceCostYear: string;
+  otherCostYear: string;
+  annualLabel: string;
+  oneTimeLabel: string;
+  totalAnnualCosts: string;
+  totalOneTimeCosts: string;
+  costsInfoTitle: string;
+  costsInfoDesc: string;
+  continueTo: string;
+  figure35: string;
+
   // Results
   roiTitle: string;
   projectedImpact: string;
@@ -79,19 +116,38 @@ interface Translation {
 
 const translations: Record<Language, Translation> = {
   de: {
-    navStart: 'Start',
+    navDashboard: 'Dashboard',
     navAnalog: 'Analoger Prozess',
-    navEvaluation: 'Bewertung',
+    navEvaluation: 'Digitaler Prozess',
+    navCosts: 'Kosten der Digitalisierung',
     navResults: 'Ergebnisse',
-    
-    heroTitle: 'Kommunale Effizienz messen.',
-    heroSubtitle: 'DiviData berechnet den Return on Investment (ROI) für digitale öffentliche Dienste. Definieren Sie Ihren kommunalen Kontext, um mit der wissenschaftlichen Bewertung zu beginnen.',
-    municipalityLabel: '01 — Name der Kommune',
-    municipalityPlaceholder: 'z.B. Stadt München',
-    useCaseLabel: '02 — Anwendungsfall',
-    startMapping: 'Prozessierung starten',
 
-    mapProcessTitle: 'Analogen Prozess abbilden',
+    authSignIn: 'Anmelden',
+    authSignUp: 'Registrieren',
+    authStadtnameLabel: '01 — Stadtname',
+    authStadtnamePlaceholder: 'z.B. Stadt München',
+    authPasswordLabel: '02 — Passwort',
+    authConfirmPasswordLabel: '03 — Passwort bestätigen',
+    authPasswordMismatch: 'Die Passwörter stimmen nicht überein.',
+    authSignInAction: 'Anmelden',
+    authSignUpAction: 'Registrieren',
+    authSignOutAction: 'Abmelden',
+    heroTitle: 'Kommunale\nEffizienz\nmessen.',
+    heroSubtitle: 'DiviData berechnet den Return on Investment (ROI) für digitale öffentliche Dienste. Melden Sie sich an, um mit der wissenschaftlichen Bewertung zu beginnen.',
+
+    dashboardLabel: 'Übersicht',
+    dashboardWelcome: 'Willkommen',
+    dashboardSubtitle: 'Wählen Sie einen Anwendungsfall oder sehen Sie Ihre bisherigen Projekte ein.',
+    dashboardNewUseCase: 'Wählen Sie einen neuen Anwendungsfall',
+    dashboardEwaDesc: 'Elektronische Wohnsitzanmeldung — ROI-Berechnung für den digitalen Meldeprozess.',
+    dashboardComingSoon: 'Demnächst',
+    dashboardMoreUseCases: 'Weitere Anwendungsfälle folgen.',
+    dashboardPreviousProjects: 'Bisherige Projekte',
+    dashboardNoProjects: 'Hier werden Ihre Projekte gespeichert.',
+    dashboardLoading: 'Projekte werden geladen...',
+
+    mapProcessTitle: '„Schritte" festlegen',
+    mapProcessHeading: 'Analogen Prozess der Wohnsitzanmeldung abbilden',
     mapProcessDesc: 'Überprüfen und bearbeiten Sie den analogen Standardprozess. Drag & Drop von Elementen zur Anpassung.',
     stepDurationsTitle: 'Dauer der Schritte',
     stepDurationsDesc: 'Schätzen Sie die Zeit (in Minuten), die jeder Schritt im aktuellen analogen Prozess in Anspruch nimmt.',
@@ -125,6 +181,22 @@ const translations: Record<Language, Translation> = {
     calculateRoi: 'ROI berechnen',
     figure30: 'Abbildung 3.0',
 
+    costsTitle: 'Kosten der Digitalisierung',
+    costsDesc: 'Erfassen Sie die erwarteten Kosten für die Einführung und den Betrieb der digitalen Lösung.',
+    licenseCostYear: 'Lizenzkosten',
+    implementationCost: 'Implementierungskosten',
+    trainingCost: 'Schulungskosten',
+    maintenanceCostYear: 'Wartung & Support',
+    otherCostYear: 'Sonstige Kosten',
+    annualLabel: 'jährlich',
+    oneTimeLabel: 'einmalig',
+    totalAnnualCosts: 'Jährliche Gesamtkosten',
+    totalOneTimeCosts: 'Einmalige Gesamtkosten',
+    costsInfoTitle: 'Kostenmodell',
+    costsInfoDesc: 'Einmalige Kosten (Implementierung, Schulung) werden auf 5 Jahre verteilt. Jährliche Kosten (Lizenzen, Wartung) fließen direkt in die ROI-Berechnung ein.',
+    continueTo: 'Weiter zu Ergebnisse',
+    figure35: 'Abbildung 3.5',
+
     roiTitle: 'ROI-Berechnungsergebnisse',
     projectedImpact: 'Projizierte Auswirkung für',
     costSavingsYear: 'Kosteneinsparung / Jahr',
@@ -148,19 +220,38 @@ const translations: Record<Language, Translation> = {
     casesMonth: 'Fälle / Monat',
   },
   en: {
-    navStart: 'Start',
+    navDashboard: 'Dashboard',
     navAnalog: 'Analog Process',
-    navEvaluation: 'Evaluation',
+    navEvaluation: 'Digital Process',
+    navCosts: 'Digitalization Costs',
     navResults: 'Results',
-    
-    heroTitle: 'Measure\nGovernment\nEfficiency.',
-    heroSubtitle: 'DiviData calculates the Return on Investment (ROI) for digital public services. Define your municipality context to begin the scientific assessment.',
-    municipalityLabel: '01 — Municipality Name',
-    municipalityPlaceholder: 'e.g. Stadt München',
-    useCaseLabel: '02 — Use Case',
-    startMapping: 'Start Mapping',
 
-    mapProcessTitle: 'Map the Analog Process',
+    authSignIn: 'Sign In',
+    authSignUp: 'Sign Up',
+    authStadtnameLabel: '01 — City Name',
+    authStadtnamePlaceholder: 'e.g. Stadt München',
+    authPasswordLabel: '02 — Password',
+    authConfirmPasswordLabel: '03 — Confirm Password',
+    authPasswordMismatch: 'Passwords do not match.',
+    authSignInAction: 'Sign In',
+    authSignUpAction: 'Sign Up',
+    authSignOutAction: 'Sign Out',
+    heroTitle: 'Measure\nGovernment\nEfficiency.',
+    heroSubtitle: 'DiviData calculates the Return on Investment (ROI) for digital public services. Sign in to begin the scientific assessment.',
+
+    dashboardLabel: 'Overview',
+    dashboardWelcome: 'Welcome',
+    dashboardSubtitle: 'Choose a use case or review your previous projects.',
+    dashboardNewUseCase: 'Choose a new use case',
+    dashboardEwaDesc: 'Electronic residence registration — ROI calculation for the digital registration process.',
+    dashboardComingSoon: 'Coming Soon',
+    dashboardMoreUseCases: 'More use cases coming soon.',
+    dashboardPreviousProjects: 'Previous Projects',
+    dashboardNoProjects: 'Your projects will be saved here.',
+    dashboardLoading: 'Loading projects...',
+
+    mapProcessTitle: 'Define Steps',
+    mapProcessHeading: 'Map the Analog Residence Registration Process',
     mapProcessDesc: 'Review and edit the standard analog process. Drag and drop elements to reflect the current physical workflow.',
     stepDurationsTitle: 'Step Durations',
     stepDurationsDesc: 'Estimate the time (in minutes) each step takes in the current analog process.',
@@ -194,6 +285,22 @@ const translations: Record<Language, Translation> = {
     calculateRoi: 'Calculate ROI',
     figure30: 'Figure 3.0',
 
+    costsTitle: 'Digitalization Costs',
+    costsDesc: 'Enter the expected costs for implementing and operating the digital solution.',
+    licenseCostYear: 'License Costs',
+    implementationCost: 'Implementation Costs',
+    trainingCost: 'Training Costs',
+    maintenanceCostYear: 'Maintenance & Support',
+    otherCostYear: 'Other Costs',
+    annualLabel: 'annual',
+    oneTimeLabel: 'one-time',
+    totalAnnualCosts: 'Total Annual Costs',
+    totalOneTimeCosts: 'Total One-Time Costs',
+    costsInfoTitle: 'Cost Model',
+    costsInfoDesc: 'One-time costs (implementation, training) are amortized over 5 years. Annual costs (licenses, maintenance) flow directly into the ROI calculation.',
+    continueTo: 'Continue to Results',
+    figure35: 'Figure 3.5',
+
     roiTitle: 'ROI Calculation Results',
     projectedImpact: 'Projected impact for',
     costSavingsYear: 'Cost Savings / Year',
@@ -225,8 +332,8 @@ interface LangState {
 }
 
 export const useLangStore = create<LangState>((set) => ({
-  language: 'en', // Default to English
-  t: translations.en,
+  language: 'de', // Default to German
+  t: translations.de,
   setLanguage: (lang) => set({ language: lang, t: translations[lang] }),
 }));
 

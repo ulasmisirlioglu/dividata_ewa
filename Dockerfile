@@ -32,3 +32,4 @@ EXPOSE 3000
 # Start the app
 CMD ["serve", "-s", "dist", "-l", "3000"]
 
+

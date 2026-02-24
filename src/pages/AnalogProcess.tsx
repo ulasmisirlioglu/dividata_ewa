@@ -37,7 +37,7 @@ export const AnalogProcess: React.FC = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      navigate('/');
+      navigate('/dashboard');
     }
   };
 
@@ -69,7 +69,7 @@ export const AnalogProcess: React.FC = () => {
             <div className="animate-fade-in">
               <div className="mb-6">
                 <FigLabel>{t.figure20}</FigLabel>
-                <h2 className="text-3xl font-light mb-2">{t.mapProcessTitle}</h2>
+                <h2 className="text-3xl font-light mb-2">{t.mapProcessHeading}</h2>
                 <p className="text-hb-gray font-light">{t.mapProcessDesc}</p>
               </div>
               <div className="rounded-none overflow-hidden border border-hb-line shadow-2xl shadow-black/5">
@@ -173,7 +173,7 @@ export const AnalogProcess: React.FC = () => {
                       value={monthlyVolume}
                       onChange={(e) => setMonthlyVolume(parseInt(e.target.value) || 0)}
                       className="hb-input text-3xl font-light py-4"
-                      placeholder="e.g. 500"
+                      placeholder="z.B. 500"
                     />
                     <span className="absolute right-0 bottom-4 text-sm text-hb-gray">{t.casesPerMonth}</span>
                   </div>
