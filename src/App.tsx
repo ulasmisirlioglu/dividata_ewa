@@ -3,7 +3,7 @@ import { Auth } from './pages/Auth';
 import { Dashboard } from './pages/Dashboard';
 import { AnalogProcess } from './pages/AnalogProcess';
 import { Evaluation } from './pages/Evaluation';
-import { DigitalizationCosts } from './pages/DigitalizationCosts';
+import { ProcessParameters } from './pages/ProcessParameters';
 import { Results } from './pages/Results';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -23,8 +23,8 @@ function App() {
         <Route path="/ewa-evaluation" element={
           <ProtectedRoute><Evaluation /></ProtectedRoute>
         } />
-        <Route path="/digitalization-costs" element={
-          <ProtectedRoute><DigitalizationCosts /></ProtectedRoute>
+        <Route path="/process-parameters" element={
+          <ProtectedRoute><ProcessParameters /></ProtectedRoute>
         } />
         <Route path="/results" element={
           <ProtectedRoute><Results /></ProtectedRoute>

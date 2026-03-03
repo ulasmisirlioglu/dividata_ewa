@@ -97,9 +97,11 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave }) => {
         if (warnings.length) {
           console.warn('BPMN Import Warnings', warnings);
         }
-        // Zoom to fit after import
+        // Zoom to fit after import, slightly zoomed out for comfortable padding
         const canvas = modeler.get('canvas');
         canvas.zoom('fit-viewport');
+        const zoomLevel = canvas.zoom();
+        canvas.zoom(zoomLevel * 0.85);
       });
     } catch (err) {
       console.error('BPMN Import Error', err);
@@ -109,6 +111,18 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave }) => {
       modeler.destroy();
     };
   }, []);
+
+  const handleZoomIn = () => {
+    if (!modelerRef.current) return;
+    const canvas = modelerRef.current.get('canvas');
+    canvas.zoom(canvas.zoom() * 1.2);
+  };
+
+  const handleZoomOut = () => {
+    if (!modelerRef.current) return;
+    const canvas = modelerRef.current.get('canvas');
+    canvas.zoom(canvas.zoom() / 1.2);
+  };
 
   const handleSave = async () => {
     if (!modelerRef.current) return;
@@ -123,6 +137,33 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave }) => {
   return (
     <div className="flex flex-col h-[600px] bg-white border border-hb-line relative">
       <div className="flex-grow bg-white" ref={containerRef} />
+      {/* Zoom controls — left side, below palette */}
+      <div className="absolute left-[14px] bottom-14 z-10 flex flex-col bg-white border border-hb-line shadow-sm">
+        <button
+          onClick={handleZoomIn}
+          title="Zoom in"
+          className="w-[46px] h-[46px] flex items-center justify-center text-hb-gray hover:text-hb-ink hover:bg-hb-paper transition-colors text-lg font-light"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="7" cy="7" r="5.5" />
+            <line x1="11" y1="11" x2="15" y2="15" />
+            <line x1="4.5" y1="7" x2="9.5" y2="7" />
+            <line x1="7" y1="4.5" x2="7" y2="9.5" />
+          </svg>
+        </button>
+        <div className="border-t border-hb-line" />
+        <button
+          onClick={handleZoomOut}
+          title="Zoom out"
+          className="w-[46px] h-[46px] flex items-center justify-center text-hb-gray hover:text-hb-ink hover:bg-hb-paper transition-colors text-lg font-light"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="7" cy="7" r="5.5" />
+            <line x1="11" y1="11" x2="15" y2="15" />
+            <line x1="4.5" y1="7" x2="9.5" y2="7" />
+          </svg>
+        </button>
+      </div>
       <div className="absolute top-6 right-6 z-10">
         <button
           onClick={handleSave}

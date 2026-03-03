@@ -60,7 +60,12 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      verify_login: {
+        Args: { input_stadtname: string; input_password: string };
+        Returns: { success: boolean; user_id?: string; stadtname?: string };
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

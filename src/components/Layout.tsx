@@ -1,14 +1,12 @@
 import React from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { LayoutDashboard, Activity, FileText, Wallet, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Activity, FileText, SlidersHorizontal, BarChart3 } from 'lucide-react';
 import { DecorativeGrid } from './Decorations';
 import { useLangStore } from '../store/useLangStore';
-import { useAuthStore } from '../store/useAuthStore';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 export const Navbar: React.FC = () => {
-  const { isAuthenticated, stadtname } = useAuthStore();
 
   return (
     <nav className="fixed top-0 left-0 right-0 bg-hb-paper/90 backdrop-blur-sm z-50 border-b border-hb-line h-24 flex items-center">
@@ -17,12 +15,7 @@ export const Navbar: React.FC = () => {
           <div className="font-display font-semibold text-3xl tracking-tight">DIVIDATA</div>
           <span className="text-sm font-mono text-hb-gray tracking-widest uppercase">Öffentlicher Sektor ROI v1.0</span>
         </div>
-        <div className="flex items-center space-x-4">
-          {isAuthenticated && (
-            <span className="text-xs font-mono text-hb-gray tracking-wider">
-              {stadtname}
-            </span>
-          )}
+        <div className="flex items-center mr-8">
           <LanguageSwitcher />
         </div>
       </div>
@@ -39,7 +32,7 @@ export const Sidebar: React.FC = () => {
     { path: '/dashboard', label: t.navDashboard, icon: LayoutDashboard },
     { path: '/analog-process', label: t.navAnalog, icon: Activity },
     { path: '/ewa-evaluation', label: t.navEvaluation, icon: FileText },
-    { path: '/digitalization-costs', label: t.navCosts, icon: Wallet },
+    { path: '/process-parameters', label: t.navParams, icon: SlidersHorizontal },
     { path: '/results', label: t.navResults, icon: BarChart3 },
   ];
 

@@ -246,8 +246,10 @@ export const initialBpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
         <di:waypoint x="1390" y="170" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
-        <di:waypoint x="1420" y="170" />
-        <di:waypoint x="1420" y="502" />
+        <di:waypoint x="1490" y="130" />
+        <di:waypoint x="1520" y="130" />
+        <di:waypoint x="1520" y="520" />
+        <di:waypoint x="1438" y="520" />
       </bpmndi:BPMNEdge>
 
     </bpmndi:BPMNPlane>

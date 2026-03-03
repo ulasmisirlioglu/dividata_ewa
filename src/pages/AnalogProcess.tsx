@@ -4,17 +4,17 @@ import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { BPMNEditor } from '../components/BPMNEditor';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
 import clsx from 'clsx';
 import { FigLabel } from '../components/Decorations';
 
 export const AnalogProcess: React.FC = () => {
   const navigate = useNavigate();
-  const { 
-    bpmnXml, setBpmnXml, 
-    stepDurations, setStepDuration,
+  const {
+    bpmnXml, setBpmnXml,
+    stepDurations, setStepDuration, setStepActor,
     salaryGroup, setSalaryGroup,
-    monthlyVolume, setMonthlyVolume
+    salaryRates, setSalaryRate,
   } = useStore();
   const { t } = useLangStore();
 
@@ -83,7 +83,7 @@ export const AnalogProcess: React.FC = () => {
             <div className="max-w-4xl animate-fade-in">
               <div className="mb-8">
                 <FigLabel>{t.figure21}</FigLabel>
-                <h2 className="text-3xl font-light mb-2">{t.stepDurationsTitle}</h2>
+                <h2 className="text-3xl font-light mb-2">{t.stepDurationsHeading}</h2>
                 <p className="text-hb-gray font-light">{t.stepDurationsDesc}</p>
               </div>
               
@@ -92,7 +92,7 @@ export const AnalogProcess: React.FC = () => {
                   <thead>
                     <tr>
                       <th className="hb-table-header px-6 pt-6">{t.stepNameHeader}</th>
-                      <th className="hb-table-header px-6 pt-6 text-right">{t.suggestedHeader}</th>
+                      <th className="hb-table-header px-6 pt-6 text-center">{t.actorHeader}</th>
                       <th className="hb-table-header px-6 pt-6 text-right">{t.estimateHeader}</th>
                     </tr>
                   </thead>
@@ -100,12 +100,37 @@ export const AnalogProcess: React.FC = () => {
                     {stepDurations.map((step) => (
                       <tr key={step.id} className="hover:bg-hb-paper transition-colors">
                         <td className="hb-table-cell px-6 font-medium">{step.name}</td>
-                        <td className="hb-table-cell px-6 text-right text-hb-gray">{step.suggested}</td>
+                        <td className="hb-table-cell px-6">
+                          <div className="flex justify-center gap-1">
+                            <button
+                              onClick={() => setStepActor(step.id, 'Mitarbeiter')}
+                              className={clsx(
+                                'px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
+                                step.actor === 'Mitarbeiter'
+                                  ? 'bg-hb-ink text-white border-hb-ink'
+                                  : 'bg-transparent text-hb-gray hover:bg-hb-paper'
+                              )}
+                            >
+                              Mitarbeiter
+                            </button>
+                            <button
+                              onClick={() => setStepActor(step.id, 'Bürger')}
+                              className={clsx(
+                                'px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
+                                step.actor === 'Bürger'
+                                  ? 'bg-hb-ink text-white border-hb-ink'
+                                  : 'bg-transparent text-hb-gray hover:bg-hb-paper'
+                              )}
+                            >
+                              Bürger
+                            </button>
+                          </div>
+                        </td>
                         <td className="hb-table-cell px-6 text-right">
                           <input
                             type="number"
                             min="0"
-                            value={step.actual}
+                            value={step.actual || ''}
                             onChange={(e) => setStepDuration(step.id, parseFloat(e.target.value) || 0)}
                             className="bg-transparent border-b border-hb-line w-20 text-right focus:border-hb-ink focus:outline-none py-1 transition-colors"
                           />
@@ -113,9 +138,10 @@ export const AnalogProcess: React.FC = () => {
                       </tr>
                     ))}
                     <tr className="bg-hb-paper font-semibold">
-                      <td className="hb-table-cell px-6">{t.totalDuration}</td>
-                      <td className="hb-table-cell px-6 text-right">{stepDurations.reduce((acc, s) => acc + s.suggested, 0)} min</td>
-                      <td className="hb-table-cell px-6 text-right text-hb-ink">{stepDurations.reduce((acc, s) => acc + s.actual, 0)} min</td>
+                      <td className="hb-table-cell px-6" colSpan={2}>{t.totalDuration}</td>
+                      <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
+                        {stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} Mitarbeiter-Min. + {stepDurations.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} Bürger-Min.
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -139,45 +165,74 @@ export const AnalogProcess: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4">
                     {['TVöD EG 5', 'TVöD EG 6', 'TVöD EG 7', 'TVöD EG 8'].map((group) => (
                       <label key={group} className={clsx(
-                        "flex items-center p-4 border cursor-pointer transition-all duration-200",
-                        salaryGroup === group 
-                          ? "border-hb-ink bg-hb-paper" 
+                        "flex items-center justify-between p-4 border cursor-pointer transition-all duration-200",
+                        salaryGroup === group
+                          ? "border-hb-ink bg-hb-paper"
                           : "border-hb-line hover:border-hb-gray"
                       )}>
-                        <input
-                          type="radio"
-                          name="salaryGroup"
-                          checked={salaryGroup === group}
-                          onChange={() => setSalaryGroup(group)}
-                          className="hidden"
-                        />
-                        <div className={clsx(
-                          "w-4 h-4 rounded-full border mr-3 flex items-center justify-center",
-                           salaryGroup === group ? "border-hb-ink" : "border-hb-gray"
-                        )}>
-                          {salaryGroup === group && <div className="w-2 h-2 rounded-full bg-hb-ink" />}
+                        <div className="flex items-center">
+                          <input
+                            type="radio"
+                            name="salaryGroup"
+                            checked={salaryGroup === group}
+                            onChange={() => setSalaryGroup(group)}
+                            className="hidden"
+                          />
+                          <div className={clsx(
+                            "w-4 h-4 rounded-full border mr-3 flex items-center justify-center",
+                             salaryGroup === group ? "border-hb-ink" : "border-hb-gray"
+                          )}>
+                            {salaryGroup === group && <div className="w-2 h-2 rounded-full bg-hb-ink" />}
+                          </div>
+                          <span className="text-sm font-light">{group}</span>
                         </div>
-                        <span className="text-sm font-light">{group}</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={salaryRates[group] || ''}
+                            onChange={(e) => { e.stopPropagation(); setSalaryRate(group, parseFloat(e.target.value) || 0); }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-transparent border-b border-hb-line w-14 text-right focus:border-hb-ink focus:outline-none text-sm transition-colors"
+                          />
+                          <span className="text-xs text-hb-gray">{t.eurPerHour}</span>
+                        </div>
                       </label>
                     ))}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-hb-gray uppercase tracking-wider mb-4">
-                    {t.monthlyVolume}
-                  </label>
-                  <div className="relative max-w-xs group">
-                    <input
-                      type="number"
-                      value={monthlyVolume}
-                      onChange={(e) => setMonthlyVolume(parseInt(e.target.value) || 0)}
-                      className="hb-input text-3xl font-light py-4"
-                      placeholder="z.B. 500"
-                    />
-                    <span className="absolute right-0 bottom-4 text-sm text-hb-gray">{t.casesPerMonth}</span>
+              </div>
+
+              {/* Cost calculation */}
+              {(() => {
+                const mitarbeiterMin = stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0);
+                const hourlyRate = salaryRates[salaryGroup] || 0;
+                const costPerProcess = (mitarbeiterMin / 60) * hourlyRate;
+                return (
+                  <div className="hb-card mt-6 p-6">
+                    <label className="block text-xs font-medium text-hb-gray uppercase tracking-wider mb-4">
+                      {t.costPerProcess}
+                    </label>
+                    <div className="flex items-end gap-8">
+                      <div>
+                        <span className="text-4xl font-light text-hb-ink">{costPerProcess.toFixed(2)}</span>
+                        <span className="text-sm text-hb-gray ml-2">€</span>
+                      </div>
+                      <div className="text-xs text-hb-gray font-light pb-2">
+                        = {mitarbeiterMin} Min. &times; {hourlyRate} € / 60
+                      </div>
+                    </div>
                   </div>
-                </div>
+                );
+              })()}
+
+              <div className="flex items-start bg-white border border-hb-line p-6 mt-6">
+                <Info className="h-5 w-5 text-hb-ink mt-0.5 flex-shrink-0" />
+                <p className="ml-4 text-sm text-hb-gray leading-relaxed font-light">
+                  <span className="font-medium text-hb-ink block mb-1">{t.costInfoTitle}</span>
+                  {t.costInfoDesc}
+                </p>
               </div>
             </div>
           )}

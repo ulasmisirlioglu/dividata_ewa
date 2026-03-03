@@ -8,7 +8,7 @@ import { FigLabel } from '../components/Decorations';
 
 export const DigitalizationCosts: React.FC = () => {
   const navigate = useNavigate();
-  const { digitalizationCosts, setDigitalizationCosts } = useStore();
+  const { digitalizationCosts, setDigitalizationCosts, stepDurations, digitalSteps, salaryGroup, salaryRates } = useStore();
   const { t } = useLangStore();
 
   const handleNext = () => {
@@ -19,7 +19,18 @@ export const DigitalizationCosts: React.FC = () => {
     navigate('/ewa-evaluation');
   };
 
-  const totalAnnual = digitalizationCosts.licenseCostYear + digitalizationCosts.maintenanceCostYear + digitalizationCosts.otherCostYear;
+  // Calculate digital Mitarbeiterkosten pro Prozess
+  const hourlyRate = salaryRates[salaryGroup] || 0;
+  const digitalMitarbeiterMin = digitalSteps.reduce((acc, s) => {
+    const step = stepDurations.find(sd => sd.id === s.id);
+    if (!step || step.actor !== 'Mitarbeiter') return acc;
+    const analogDuration = step.actual;
+    const digRate = s.digitalizationPercent / 100;
+    return acc + (s.digitalDuration * digRate) + (analogDuration * (1 - digRate));
+  }, 0);
+  const digitalPersonnelCostPerProcess = (digitalMitarbeiterMin / 60) * hourlyRate;
+
+  const totalAnnual = digitalizationCosts.licenseCostYear + digitalizationCosts.maintenanceCostYear + digitalizationCosts.otherCostYear + digitalPersonnelCostPerProcess;
   const totalOneTime = digitalizationCosts.implementationCost + digitalizationCosts.trainingCost;
 
   const costFields = [
@@ -41,16 +52,59 @@ export const DigitalizationCosts: React.FC = () => {
           </p>
         </div>
 
+        {/* Pre-calculated digital personnel cost */}
+        <div className="hb-card p-6 mb-6 shadow-xl shadow-black/5">
+          <div className="flex items-center justify-between mb-4">
+            <label className="text-xs font-medium text-hb-gray uppercase tracking-wider">
+              {t.digitalPersonnelCost}
+            </label>
+            <span className="text-[10px] font-mono text-hb-gray/60 uppercase tracking-wider border border-hb-line px-2 py-0.5">
+              {t.preCalculated}
+            </span>
+          </div>
+          <div className="flex items-end gap-8">
+            <div>
+              <span className="text-4xl font-light text-hb-ink">{digitalPersonnelCostPerProcess.toFixed(2)}</span>
+              <span className="text-sm text-hb-gray ml-2">€ / Prozess</span>
+            </div>
+            <div className="text-xs text-hb-gray font-light pb-2">
+              = {digitalMitarbeiterMin.toFixed(1)} Min. &times; {hourlyRate} € / 60
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-start bg-white border border-hb-line p-6 mb-8 max-w-2xl">
+          <Info className="h-5 w-5 text-hb-ink mt-0.5 flex-shrink-0" />
+          <p className="ml-4 text-sm text-hb-gray leading-relaxed font-light">
+            {t.digitalPersonnelCostInfo}
+          </p>
+        </div>
+
         <div className="hb-card p-0 overflow-hidden mb-8 shadow-xl shadow-black/5">
           <table className="min-w-full">
             <thead>
               <tr>
-                <th className="hb-table-header px-6 pt-6 text-left">Kostenposition</th>
-                <th className="hb-table-header px-6 pt-6 text-right">Typ</th>
-                <th className="hb-table-header px-6 pt-6 text-right">Betrag (EUR)</th>
+                <th className="hb-table-header px-6 pt-6 text-left">{t.costPositionHeader}</th>
+                <th className="hb-table-header px-6 pt-6 text-right">{t.costTypeHeader}</th>
+                <th className="hb-table-header px-6 pt-6 text-right">{t.costAmountHeader}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hb-line">
+              {/* Digital personnel cost - read-only, pre-calculated */}
+              <tr className="hover:bg-hb-paper transition-colors">
+                <td className="hb-table-cell px-6 font-medium">{t.digitalPersonnelCost}</td>
+                <td className="hb-table-cell px-6 text-right">
+                  <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">
+                    {t.perProcessLabel}
+                  </span>
+                </td>
+                <td className="hb-table-cell px-6 text-right">
+                  <div className="flex items-center justify-end">
+                    <span className="py-1 mr-2">{digitalPersonnelCostPerProcess.toFixed(2)}</span>
+                    <span className="text-hb-gray text-xs">€</span>
+                  </div>
+                </td>
+              </tr>
               {costFields.map((field) => (
                 <tr key={field.key} className="hover:bg-hb-paper transition-colors">
                   <td className="hb-table-cell px-6 font-medium">{field.label}</td>
