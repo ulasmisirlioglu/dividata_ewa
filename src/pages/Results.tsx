@@ -328,7 +328,6 @@ export const Results: React.FC = () => {
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...INK);
     doc.text(t.pdfStep, M, y);
-    doc.text(t.pdfDigPercent, M + 105, y);
     doc.text(t.pdfDigMin, M + W, y, { align: 'right' });
     y += 1;
     doc.line(M, y, M + W, y);
@@ -338,8 +337,6 @@ export const Results: React.FC = () => {
       check(5);
       doc.setTextColor(...INK);
       doc.text(doc.splitTextToSize(ds.name, 100)[0], M, y);
-      doc.setTextColor(...GRAY);
-      doc.text(ds.digitalizationPercent + '%', M + 105, y);
       doc.setTextColor(...INK);
       doc.text(ds.digitalDuration.toString(), M + W, y, { align: 'right' });
       y += 4.5;
@@ -577,7 +574,6 @@ export const Results: React.FC = () => {
                     <th className="hb-table-header px-4 pt-4 text-center">{t.actorHeader}</th>
                     <th className="hb-table-header px-4 pt-4 text-right">{t.analogTimeHeader}</th>
                     <th className="hb-table-header px-4 pt-4">{t.digitalReplacementHeader}</th>
-                    <th className="hb-table-header px-4 pt-4 text-right">{t.digitalizationPercentHeader}</th>
                     <th className="hb-table-header px-4 pt-4 text-right">{t.digitalTimeHeader}</th>
                   </tr>
                 </thead>
@@ -591,15 +587,6 @@ export const Results: React.FC = () => {
                         <input type="text" value={step.digitalReplacement}
                           onChange={e => setDigitalStep(step.id, { digitalReplacement: e.target.value })}
                           className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all text-sm" />
-                      </td>
-                      <td className="hb-table-cell px-4 text-right">
-                        <div className="flex items-center justify-end">
-                          <input type="number" min="0" max="100"
-                            value={step.digitalizationPercent}
-                            onChange={e => setDigitalStep(step.id, { digitalizationPercent: parseFloat(e.target.value) || 0 })}
-                            className="w-14 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 mr-1 transition-colors" />
-                          <span className="text-hb-gray text-xs">%</span>
-                        </div>
                       </td>
                       <td className="hb-table-cell px-4 text-right">
                         <input type="number" min="0" value={step.digitalDuration}

@@ -49,9 +49,7 @@ export const Evaluation: React.FC = () => {
   const digitalMitarbeiterMin = digitalSteps.reduce((acc, s) => {
     const step = stepDurations.find(sd => sd.id === s.id);
     if (!step || step.actor !== 'Mitarbeiter') return acc;
-    const analogDuration = step.actual;
-    const digRate = s.digitalizationPercent / 100;
-    return acc + (s.digitalDuration * digRate) + (analogDuration * (1 - digRate));
+    return acc + s.digitalDuration;
   }, 0);
   const digitalPersonnelCostPerProcess = (digitalMitarbeiterMin / 60) * hourlyRate;
 
