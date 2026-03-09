@@ -1,128 +1,37 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { useAuthStore } from '../store/useAuthStore';
+
 import { Layout } from '../components/Layout';
 import {
-  ResponsiveContainer, LineChart, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ReferenceLine,
+  ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis,
+  CartesianGrid, Tooltip, ReferenceLine, ReferenceDot,
 } from 'recharts';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import {
-  Download, RefreshCcw, ArrowLeft, ChevronDown,
+  Download, ArrowLeft, ChevronDown,
   Plus, X, Info,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { FigLabel } from '../components/Decorations';
-import { saveProject } from '../lib/projectService';
-import type { StepDuration, DigitalStep, ProcessInterval, DigitalizationCosts } from '../store/useStore';
+// @ts-ignore
+import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
+import 'bpmn-js/dist/assets/diagram-js.css';
+import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
+import { Pencil } from 'lucide-react';
+
+import type { DigitalizationCosts } from '../store/useStore';
+import { calculatePerCaseSavings, generateTimeSeries } from '../lib/calculations';
+import { ROUTES } from '../lib/routes';
 
 /* ─── helpers ─── */
-
-function nextMonth(yyyyMm: string): string {
-  const [y, m] = yyyyMm.split('-').map(Number);
-  if (m === 12) return `${y + 1}-01`;
-  return `${y}-${String(m + 1).padStart(2, '0')}`;
-}
 
 function formatMonthLabel(yyyyMm: string, lang: 'de' | 'en'): string {
   const [year, month] = yyyyMm.split('-').map(Number);
   const d = new Date(year, month - 1);
   return d.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { month: 'short', year: 'numeric' });
-}
-
-/* ─── calculation: per-case savings ─── */
-
-interface PerCaseSavings {
-  mitarbeiterMinutesSaved: number;
-  buergerMinutesSaved: number;
-  costSavedPerCase: number;
-}
-
-function calculatePerCaseSavings(
-  stepDurations: StepDuration[],
-  digitalSteps: DigitalStep[],
-  hourlyRate: number,
-): PerCaseSavings {
-  let mitarbeiterSaved = 0;
-  let buergerSaved = 0;
-
-  for (const step of stepDurations) {
-    const ds = digitalSteps.find(d => d.id === step.id);
-    if (!ds) continue;
-    // Pro Fall: dijital kanala giren vaka her adımı tamamen dijital sürede yapıyor
-    // Kaç vakanın dijitale gittiğini interval digitalisierungsquote belirler
-    const saved = step.actual - ds.digitalDuration;
-    if (step.actor === 'Mitarbeiter') mitarbeiterSaved += saved;
-    else buergerSaved += saved;
-  }
-
-  return {
-    mitarbeiterMinutesSaved: mitarbeiterSaved,
-    buergerMinutesSaved: buergerSaved,
-    costSavedPerCase: (mitarbeiterSaved / 60) * hourlyRate,
-  };
-}
-
-/* ─── calculation: monthly time-series ─── */
-
-interface MonthlyPoint {
-  month: string;
-  cumMitarbeiterH: number;
-  cumBuergerH: number;
-  cumEur: number;
-}
-
-function generateTimeSeries(
-  intervals: ProcessInterval[],
-  perCase: PerCaseSavings,
-  costs: DigitalizationCosts,
-  hourlyRate: number,
-): MonthlyPoint[] {
-  const valid = intervals
-    .filter(i => i.von && i.bis && i.volumen > 0)
-    .sort((a, b) => a.von.localeCompare(b.von));
-
-  if (valid.length === 0) return [];
-
-  const startMonth = valid[0].von;
-  const endMonth = valid[valid.length - 1].bis;
-  if (!startMonth || !endMonth || endMonth < startMonth) return [];
-
-  const annualCosts = costs.licenseCostYear + costs.maintenanceCostYear + costs.otherCostYear;
-  const monthlyOverhead = annualCosts / 12;
-  const oneTimeCosts = costs.implementationCost + costs.trainingCost;
-
-  const result: MonthlyPoint[] = [];
-  let cumM = 0;
-  let cumB = 0;
-  let cumE = -oneTimeCosts;
-
-  let cur = startMonth;
-  while (cur <= endMonth) {
-    const interval = valid.find(i => cur >= i.von && cur <= i.bis);
-    let mH = 0;
-    let bH = 0;
-    let eurSav = 0;
-
-    if (interval) {
-      const Q = interval.digitalisierungsquote / 100;
-      const V = interval.volumen;
-      mH = V * Q * perCase.mitarbeiterMinutesSaved / 60;
-      bH = V * Q * perCase.buergerMinutesSaved / 60;
-      eurSav = V * Q * (perCase.mitarbeiterMinutesSaved / 60) * hourlyRate;
-    }
-
-    cumM += mH;
-    cumB += bH;
-    cumE += eurSav - monthlyOverhead;
-
-    result.push({ month: cur, cumMitarbeiterH: cumM, cumBuergerH: cumB, cumEur: cumE });
-    cur = nextMonth(cur);
-  }
-
-  return result;
 }
 
 /* ─── CollapsibleSection ─── */
@@ -153,30 +62,49 @@ export const Results: React.FC = () => {
   const navigate = useNavigate();
   const store = useStore();
   const {
-    municipalityName, useCase,
+    useCase, bpmnXml,
     stepDurations, setStepDuration, setStepActor,
     digitalSteps, setDigitalStep,
-    salaryGroup, setSalaryGroup, salaryRates, setSalaryRate,
+    salaryGroup, setSalaryGroup, hourlyRate, setHourlyRate,
     digitalizationCosts, setDigitalizationCosts,
     processIntervals, setProcessInterval, addProcessInterval, removeProcessInterval,
-    reset,
   } = store;
   const { t, language } = useLangStore();
-  const { userId } = useAuthStore();
+  const locale = language === 'de' ? 'de-DE' : 'en-US';
+  const { stadtname } = useAuthStore();
+
 
   // Collapsible section state
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    analog: false, salary: false, digital: false, costs: false, intervals: false,
+    bpmn: false, analog: false, salary: false, digital: false, costs: false, intervals: false,
   });
   const toggle = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // BPMN read-only viewer
+  const bpmnContainerRef = useRef<HTMLDivElement>(null);
+  const bpmnViewerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!openSections.bpmn || !bpmnContainerRef.current || !bpmnXml) return;
+
+    const viewer = new NavigatedViewer({ container: bpmnContainerRef.current });
+    bpmnViewerRef.current = viewer;
+
+    viewer.importXML(bpmnXml).then(({ warnings }: any) => {
+      if (warnings?.length) console.warn('BPMN warnings', warnings);
+      const canvas = viewer.get('canvas');
+      canvas.zoom('fit-viewport');
+      canvas.zoom(canvas.zoom() * 0.85);
+    });
+
+    return () => { viewer.destroy(); };
+  }, [openSections.bpmn, bpmnXml]);
 
   // Chart line visibility
   const [showMitarbeiter, setShowMitarbeiter] = useState(true);
   const [showBuerger, setShowBuerger] = useState(true);
 
   // Derived values
-  const hourlyRate = salaryRates[salaryGroup] || 48;
-
   const perCase = useMemo(
     () => calculatePerCaseSavings(stepDurations, digitalSteps, hourlyRate),
     [stepDurations, digitalSteps, hourlyRate],
@@ -187,16 +115,74 @@ export const Results: React.FC = () => {
     [processIntervals, perCase, digitalizationCosts, hourlyRate],
   );
 
+  const monthlyTimeData = useMemo(() => timeSeries.map(p => ({
+    month: formatMonthLabel(p.month, language),
+    [t.monthlyMitarbeiterH]: Math.round(p.mitarbeiterH * 10) / 10,
+    [t.monthlyBuergerH]: Math.round(p.buergerH * 10) / 10,
+  })), [timeSeries, language, t]);
+
+  const monthlyEurData = useMemo(() => timeSeries.map(p => ({
+    month: formatMonthLabel(p.month, language),
+    [t.monthlyNetSavings]: Math.round(p.eurSav * 100) / 100,
+  })), [timeSeries, language, t]);
+
   const timeChartData = useMemo(() => timeSeries.map(p => ({
     month: formatMonthLabel(p.month, language),
     [t.mitarbeiterHoursFreed]: Math.round(p.cumMitarbeiterH * 10) / 10,
     [t.buergerHoursFreed]: Math.round(p.cumBuergerH * 10) / 10,
   })), [timeSeries, language, t]);
 
-  const eurChartData = useMemo(() => timeSeries.map(p => ({
+  const eurChartData = useMemo(() => timeSeries.map((p, i) => ({
+    idx: i,
     month: formatMonthLabel(p.month, language),
     [t.cumulativeNetSavings]: Math.round(p.cumEur * 100) / 100,
   })), [timeSeries, language, t]);
+
+  const breakEvenPoint = useMemo(() => {
+    const crossIdx = timeSeries.findIndex((p, i) => i > 0 && timeSeries[i - 1].cumEur < 0 && p.cumEur >= 0);
+    if (crossIdx <= 0) return null;
+    const prev = timeSeries[crossIdx - 1];
+    const curr = timeSeries[crossIdx];
+    const fraction = Math.abs(prev.cumEur) / (Math.abs(prev.cumEur) + Math.abs(curr.cumEur));
+    const [pY, pM] = prev.month.split('-').map(Number);
+    const [cY, cM] = curr.month.split('-').map(Number);
+    const prevDate = new Date(pY, pM - 1, 1);
+    const currDate = new Date(cY, cM - 1, 1);
+    const beDate = new Date(prevDate.getTime() + fraction * (currDate.getTime() - prevDate.getTime()));
+    const monthNames = language === 'de'
+      ? ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sept.', 'Okt.', 'Nov.', 'Dez.']
+      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return {
+      x: crossIdx - 1 + fraction,
+      label: `Break-Even: ${beDate.getDate()}. ${monthNames[beDate.getMonth()]} ${beDate.getFullYear()}`,
+    };
+  }, [timeSeries, language]);
+
+  // Break-even calculation
+  const breakEven = useMemo(() => {
+    if (timeSeries.length === 0) return null;
+    const beIndex = timeSeries.findIndex(p => p.cumEur >= 0);
+    if (beIndex === -1) return null;
+    const beMonth = timeSeries[beIndex].month;
+    const startMonth = timeSeries[0].month;
+    // Calculate months between start and break-even
+    const [sy, sm] = startMonth.split('-').map(Number);
+    const [by, bm] = beMonth.split('-').map(Number);
+    const monthsCount = (by - sy) * 12 + (bm - sm) + 1;
+    return { month: beMonth, monthsCount };
+  }, [timeSeries]);
+
+  // ROI calculation
+  const roi = useMemo(() => {
+    if (timeSeries.length === 0) return null;
+    const last = timeSeries[timeSeries.length - 1];
+    const months = timeSeries.length;
+    const annualCosts = digitalizationCosts.licenseCostYear + digitalizationCosts.maintenanceCostYear + digitalizationCosts.otherCostYear;
+    const oneTimeCosts = digitalizationCosts.implementationCost + digitalizationCosts.trainingCost;
+    const totalInvestment = oneTimeCosts + (annualCosts / 12) * months;
+    if (totalInvestment === 0) return null;
+    return Math.round((last.cumEur / totalInvestment) * 10000) / 100;
+  }, [timeSeries, digitalizationCosts]);
 
   // Helper to get actor for a digital step
   const getActor = (id: string) => stepDurations.find(s => s.id === id)?.actor ?? '';
@@ -220,42 +206,262 @@ export const Results: React.FC = () => {
   };
 
   /* PDF */
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
+    const INK = [17, 17, 17] as const;
+    const GRAY = [102, 102, 102] as const;
+    const LINE = [224, 224, 224] as const;
+    const PAPER = [247, 247, 247] as const;
+    const M = 20;
+    const W = 170; // usable width
     const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text(`DiviData Bericht: ${municipalityName}`, 20, 20);
-    doc.setFontSize(12);
-    doc.text(`Anwendungsfall: ${useCase}`, 20, 30);
-    doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, 20, 36);
-    doc.setFontSize(16);
-    doc.text('Ergebnisse pro Fall', 20, 50);
-    doc.setFontSize(12);
-    doc.text(`${t.mitarbeiterMinSaved}: ${perCase.mitarbeiterMinutesSaved.toFixed(1)} min`, 20, 60);
-    doc.text(`${t.buergerMinSaved}: ${perCase.buergerMinutesSaved.toFixed(1)} min`, 20, 66);
-    doc.text(`${t.costSavingsPerCase}: ${perCase.costSavedPerCase.toFixed(2)} EUR`, 20, 72);
-    if (timeSeries.length > 0) {
-      const last = timeSeries[timeSeries.length - 1];
-      doc.setFontSize(16);
-      doc.text('Kumulierte Prognose', 20, 88);
-      doc.setFontSize(12);
-      doc.text(`${t.mitarbeiterHoursFreed}: ${last.cumMitarbeiterH.toFixed(0)} h`, 20, 98);
-      doc.text(`${t.buergerHoursFreed}: ${last.cumBuergerH.toFixed(0)} h`, 20, 104);
-      doc.text(`${t.cumulativeNetSavings}: ${last.cumEur.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`, 20, 110);
+    let y = 0;
+
+    const eur = (v: number) => v.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+    const check = (need: number) => { if (y + need > 280) { addFooter(); doc.addPage(); y = 20; } };
+
+    const addFooter = () => {
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY);
+      doc.text(t.pdfConfidential, 105, 290, { align: 'center' });
+    };
+
+    const heading = (text: string) => {
+      check(16);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...INK);
+      doc.text(text, M, y);
+      y += 2;
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.4);
+      doc.line(M, y, M + W, y);
+      y += 7;
+    };
+
+    const label = (text: string) => {
+      check(8);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...GRAY);
+      doc.text(text.toUpperCase(), M, y);
+      y += 5;
+    };
+
+    const kv = (key: string, val: string) => {
+      check(6);
+      doc.setFontSize(9.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...GRAY);
+      doc.text(key, M, y);
+      doc.setTextColor(...INK);
+      doc.text(val, M + W, y, { align: 'right' });
+      y += 5;
+    };
+
+    const captureChart = async (id: string): Promise<{ img: string; w: number; h: number } | null> => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const canvas = await html2canvas(el, { backgroundColor: '#FFFFFF', scale: 2 });
+      return { img: canvas.toDataURL('image/png'), w: canvas.width, h: canvas.height };
+    };
+
+    const pageHeader = () => {
+      doc.setFillColor(...PAPER);
+      doc.rect(0, 0, 210, 15, 'F');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...GRAY);
+      doc.text('DiviData', M, 10);
+      doc.text(stadtname || '', M + W, 10, { align: 'right' });
+    };
+
+    // ═══ PAGE 1: COVER + INPUTS ═══
+    y = 55;
+    doc.setFillColor(...PAPER);
+    doc.rect(0, 0, 210, 45, 'F');
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text('DiviData', M, 22);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text(t.roiTitle, M, 30);
+    doc.setFontSize(9);
+    doc.text(new Date().toLocaleDateString(locale), M + W, 22, { align: 'right' });
+    if (stadtname) doc.text(stadtname, M + W, 30, { align: 'right' });
+
+    // ─── INPUTS ───
+    heading(t.pdfInputParams);
+
+    label(t.resultsAnalogSteps);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text(t.pdfStep, M, y);
+    doc.text(t.pdfActor, M + 95, y);
+    doc.text(t.pdfMinLabel, M + W, y, { align: 'right' });
+    y += 1;
+    doc.setDrawColor(...LINE);
+    doc.line(M, y, M + W, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    for (const step of stepDurations) {
+      check(5);
+      doc.setTextColor(...INK);
+      doc.text(doc.splitTextToSize(step.name, 90)[0], M, y);
+      doc.setTextColor(...GRAY);
+      doc.text(step.actor, M + 95, y);
+      doc.setTextColor(...INK);
+      doc.text(step.actual.toString(), M + W, y, { align: 'right' });
+      y += 4.5;
     }
-    doc.text('Dieser Bericht wurde von DiviData erstellt.', 20, 280);
-    doc.save('dividata-report.pdf');
+    y += 4;
+
+    label(`TVöD EG ${salaryGroup}  |  ${hourlyRate} ${t.eurPerHour}`);
+    y += 3;
+
+    label(t.resultsDigitalSteps);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text(t.pdfStep, M, y);
+    doc.text(t.pdfDigPercent, M + 105, y);
+    doc.text(t.pdfDigMin, M + W, y, { align: 'right' });
+    y += 1;
+    doc.line(M, y, M + W, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    for (const ds of digitalSteps) {
+      check(5);
+      doc.setTextColor(...INK);
+      doc.text(doc.splitTextToSize(ds.name, 100)[0], M, y);
+      doc.setTextColor(...GRAY);
+      doc.text(ds.digitalizationPercent + '%', M + 105, y);
+      doc.setTextColor(...INK);
+      doc.text(ds.digitalDuration.toString(), M + W, y, { align: 'right' });
+      y += 4.5;
+    }
+    y += 4;
+
+    check(30);
+    label(t.pdfDigCosts);
+    kv(t.implementationCost, eur(digitalizationCosts.implementationCost));
+    kv(t.trainingCost, eur(digitalizationCosts.trainingCost));
+    kv(t.licenseCostYear, eur(digitalizationCosts.licenseCostYear));
+    kv(t.maintenanceCostYear, eur(digitalizationCosts.maintenanceCostYear));
+    kv(t.otherCostYear, eur(digitalizationCosts.otherCostYear));
+    y += 4;
+
+    check(20);
+    label(t.pdfProcessIntervals);
+    const validIntervals = processIntervals.filter(i => i.von && i.bis && i.volumen > 0);
+    for (const iv of validIntervals) {
+      check(6);
+      doc.setFontSize(8.5);
+      doc.setTextColor(...INK);
+      doc.text(`${formatMonthLabel(iv.von, language)} – ${formatMonthLabel(iv.bis, language)}`, M, y);
+      doc.setTextColor(...GRAY);
+      doc.text(`${iv.volumen} ${t.pdfCasesMonth}  |  ${iv.digitalisierungsquote}%`, M + W, y, { align: 'right' });
+      y += 5;
+    }
+
+    addFooter();
+
+    // ═══ PAGE 2: RESULTS ═══
+    doc.addPage();
+    y = 20;
+    pageHeader();
+
+    // Section title with top spacing
+    y += 8;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text(t.navResults, M, y);
+    y += 10;
+
+    heading(t.timeSavingsPerCase);
+    kv(t.mitarbeiterMinSaved, perCase.mitarbeiterMinutesSaved.toFixed(1) + ' min');
+    kv(t.buergerMinSaved, perCase.buergerMinutesSaved.toFixed(1) + ' min');
+    y += 3;
+
+    heading(t.costSavingsPerCase);
+    kv(t.costSavingsPerCase, eur(perCase.costSavedPerCase));
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text(`= (${perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) x ${hourlyRate} ${t.eurPerHour}`, M, y);
+    y += 8;
+
+    heading(t.breakEvenLabel);
+    if (breakEven) {
+      kv(t.breakEvenDate, formatMonthLabel(breakEven.month, language));
+      kv(t.breakEvenDuration, breakEven.monthsCount + ' ' + t.months);
+    } else {
+      doc.setFontSize(9.5);
+      doc.setTextColor(...GRAY);
+      doc.text(t.breakEvenNotReached, M, y);
+      y += 5;
+    }
+    y += 3;
+
+    heading(t.roiLabel);
+    if (roi !== null && timeSeries.length > 0) {
+      kv('ROI', roi.toFixed(1) + ' %');
+      kv(t.roiPeriod, formatMonthLabel(timeSeries[0].month, language) + ' – ' + formatMonthLabel(timeSeries[timeSeries.length - 1].month, language) + ` (${timeSeries.length} ${t.months})`);
+    } else {
+      doc.setFontSize(9.5);
+      doc.setTextColor(...GRAY);
+      doc.text(t.roiNotAvailable, M, y);
+      y += 5;
+    }
+
+    // ═══ CHARTS — sequential, flowing after results ═══
+    const chartIds = [
+      { id: 'chart-monthly-time', title: t.monthlyTimeTitle },
+      { id: 'chart-cum-time', title: t.timeProjectionTitle },
+      { id: 'chart-monthly-eur', title: t.monthlyEurTitle },
+      { id: 'chart-cum-eur', title: t.eurProjectionTitle },
+    ];
+
+    // Capture all charts first
+    const chartImages: { title: string; img: string; w: number; h: number }[] = [];
+    for (const chart of chartIds) {
+      const result = await captureChart(chart.id);
+      if (result) chartImages.push({ title: chart.title, ...result });
+    }
+
+    const MAX_CHART_H = 110;
+    for (const ci of chartImages) {
+      const ratio = ci.h / ci.w;
+      let chartH = W * ratio;
+      if (chartH > MAX_CHART_H) chartH = MAX_CHART_H;
+      // Check if chart fits on current page, otherwise new page
+      const needed = chartH + 18; // title + chart + spacing
+      if (y + needed > 275) {
+        addFooter();
+        doc.addPage();
+        pageHeader();
+        y = 22;
+      }
+      y += 4;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...INK);
+      doc.text(ci.title, M, y);
+      y += 3;
+      doc.addImage(ci.img, 'PNG', M, y, W, chartH);
+      y += chartH + 6;
+    }
+
+    addFooter();
+
+    doc.save(`dividata-bericht-${(stadtname || 'report').toLowerCase().replace(/\s+/g, '-')}.pdf`);
   };
 
-  /* Auto-save */
-  React.useEffect(() => {
-    if (userId) {
-      saveProject(userId, {
-        municipalityName, useCase,
-        bpmnXml: useStore.getState().bpmnXml,
-        stepDurations, digitalSteps, salaryGroup, monthlyVolume: store.monthlyVolume, digitalizationCosts,
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── RENDER ─── */
   return (
@@ -265,18 +471,11 @@ export const Results: React.FC = () => {
         {/* ── Header ── */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <FigLabel>{t.figure50}</FigLabel>
+
             <h1 className="text-4xl font-light text-hb-ink mb-2">{t.roiTitle}</h1>
-            <p className="text-hb-gray font-light">{t.projectedImpact} {municipalityName}</p>
+            <p className="text-hb-gray font-light">{t.projectedImpact} {stadtname}</p>
           </div>
           <div className="flex space-x-4">
-            <button
-              onClick={() => { if (confirm(t.reset + '?')) { reset(); window.location.href = '/dashboard'; } }}
-              className="hb-btn-secondary text-hb-gray hover:text-hb-ink px-4 py-2 transition-colors flex items-center border-transparent hover:border-transparent"
-            >
-              <RefreshCcw size={18} className="mr-2" />
-              {t.reset}
-            </button>
             <button onClick={handleDownloadPdf} className="hb-btn-primary flex items-center shadow-lg shadow-black/5">
               <Download size={20} className="mr-2" />
               {t.downloadReport}
@@ -289,6 +488,20 @@ export const Results: React.FC = () => {
            ═══════════════════════════════════════ */}
         <div>
           <h2 className="text-xs font-medium uppercase tracking-widest text-hb-gray mb-4">{t.resultsInputsTitle}</h2>
+
+          {/* 1 — BPMN Process */}
+          <CollapsibleSection title={t.resultsBpmnProcess} isOpen={!!openSections.bpmn} onToggle={() => toggle('bpmn')}>
+            <div className="mt-4 relative">
+              <div ref={bpmnContainerRef} className="h-[400px] bg-white border border-hb-line" />
+              <button
+                onClick={() => navigate(ROUTES.ANALOG_PROCESS)}
+                className="absolute top-3 right-3 z-10 flex items-center gap-2 bg-white border border-hb-line text-hb-ink hover:border-hb-ink px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors shadow-sm"
+              >
+                <Pencil size={14} />
+                {t.editBpmn}
+              </button>
+            </div>
+          </CollapsibleSection>
 
           {/* 1a — Analog Steps */}
           <CollapsibleSection title={t.resultsAnalogSteps} isOpen={!!openSections.analog} onToggle={() => toggle('analog')}>
@@ -311,12 +524,12 @@ export const Results: React.FC = () => {
                             onClick={() => setStepActor(step.id, 'Mitarbeiter')}
                             className={clsx('px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
                               step.actor === 'Mitarbeiter' ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
-                          >Mitarbeiter</button>
+                          >{t.employeeLabel}</button>
                           <button
                             onClick={() => setStepActor(step.id, 'Bürger')}
                             className={clsx('px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
                               step.actor === 'Bürger' ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
-                          >Bürger</button>
+                          >{t.citizenLabel}</button>
                         </div>
                       </td>
                       <td className="hb-table-cell px-4 text-right">
@@ -335,30 +548,21 @@ export const Results: React.FC = () => {
           <CollapsibleSection title={t.resultsSalary} isOpen={!!openSections.salary} onToggle={() => toggle('salary')}>
             <div className="mt-4">
               <label className="block text-xs font-medium text-hb-gray uppercase tracking-wider mb-4">{t.tariffGroup}</label>
-              <div className="grid grid-cols-2 gap-3">
-                {['TVöD EG 5', 'TVöD EG 6', 'TVöD EG 7', 'TVöD EG 8'].map(group => (
-                  <label key={group} className={clsx(
-                    'flex items-center justify-between p-4 border cursor-pointer transition-all duration-200',
-                    salaryGroup === group ? 'border-hb-ink bg-hb-paper' : 'border-hb-line hover:border-hb-gray',
-                  )}>
-                    <div className="flex items-center">
-                      <input type="radio" name="salaryGroupResults" checked={salaryGroup === group}
-                        onChange={() => setSalaryGroup(group)} className="hidden" />
-                      <div className={clsx('w-4 h-4 rounded-full border mr-3 flex items-center justify-center',
-                        salaryGroup === group ? 'border-hb-ink' : 'border-hb-gray')}>
-                        {salaryGroup === group && <div className="w-2 h-2 rounded-full bg-hb-ink" />}
-                      </div>
-                      <span className="text-sm font-light">{group}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <input type="number" min="0" value={salaryRates[group] || ''}
-                        onChange={e => { e.stopPropagation(); setSalaryRate(group, parseFloat(e.target.value) || 0); }}
-                        onClick={e => e.stopPropagation()}
-                        className="bg-transparent border-b border-hb-line w-14 text-right focus:border-hb-ink focus:outline-none text-sm transition-colors" />
-                      <span className="text-xs text-hb-gray">{t.eurPerHour}</span>
-                    </div>
-                  </label>
-                ))}
+              <div className="flex items-center gap-6 p-4 border border-hb-line">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-light">TVöD EG</span>
+                  <input type="text" value={salaryGroup}
+                    onChange={e => setSalaryGroup(e.target.value)}
+                    className="bg-transparent border-b border-hb-line w-16 text-center focus:border-hb-ink focus:outline-none text-sm transition-colors"
+                    placeholder="6" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="0" value={hourlyRate || ''}
+                    onChange={e => setHourlyRate(parseFloat(e.target.value) || 0)}
+                    className="bg-transparent border-b border-hb-line w-16 text-right focus:border-hb-ink focus:outline-none text-sm transition-colors"
+                    placeholder="48" />
+                  <span className="text-xs text-hb-gray">{t.eurPerHour}</span>
+                </div>
               </div>
             </div>
           </CollapsibleSection>
@@ -445,14 +649,14 @@ export const Results: React.FC = () => {
                     <td className="hb-table-cell px-4 text-right">
                       <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.annualLabel}</span>
                     </td>
-                    <td className="hb-table-cell px-4 text-right font-medium">{totalAnnual.toLocaleString('de-DE')} €</td>
+                    <td className="hb-table-cell px-4 text-right font-medium">{totalAnnual.toLocaleString(locale)} €</td>
                   </tr>
                   <tr className="bg-hb-paper border-t border-hb-line">
                     <td className="hb-table-cell px-4 font-medium text-sm">{t.totalOneTimeCosts}</td>
                     <td className="hb-table-cell px-4 text-right">
                       <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.oneTimeLabel}</span>
                     </td>
-                    <td className="hb-table-cell px-4 text-right font-medium">{totalOneTime.toLocaleString('de-DE')} €</td>
+                    <td className="hb-table-cell px-4 text-right font-medium">{totalOneTime.toLocaleString(locale)} €</td>
                   </tr>
                 </tfoot>
               </table>
@@ -473,7 +677,7 @@ export const Results: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hb-line">
-                  {processIntervals.map(interval => (
+                  {processIntervals.map((interval, idx) => (
                     <tr key={interval.id} className="hover:bg-hb-paper transition-colors">
                       <td className="hb-table-cell px-4 font-medium text-sm">{interval.label}</td>
                       <td className="hb-table-cell px-4">
@@ -485,7 +689,16 @@ export const Results: React.FC = () => {
                             className="bg-transparent border-b border-hb-line hover:border-hb-gray focus:border-hb-ink focus:outline-none py-1 transition-all text-sm cursor-pointer" />
                           <span className="text-xs text-hb-gray whitespace-nowrap">bis</span>
                           <input type="month" value={interval.bis}
-                            onChange={e => setProcessInterval(interval.id, { bis: e.target.value })}
+                            onChange={e => {
+                              const bisVal = e.target.value;
+                              setProcessInterval(interval.id, { bis: bisVal });
+                              if (bisVal && idx < processIntervals.length - 1) {
+                                const [y, m] = bisVal.split('-').map(Number);
+                                const next = new Date(y, m); // month is 0-indexed, so m = bis_month+1
+                                const nextVon = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+                                setProcessInterval(processIntervals[idx + 1].id, { von: nextVon });
+                              }
+                            }}
                             onClick={e => (e.target as HTMLInputElement).showPicker()}
                             className="bg-transparent border-b border-hb-line hover:border-hb-gray focus:border-hb-ink focus:outline-none py-1 transition-all text-sm cursor-pointer" />
                         </div>
@@ -525,52 +738,140 @@ export const Results: React.FC = () => {
         </div>
 
         {/* ═══════════════════════════════════════
-            SECTION 2 — ZEITERSPARNIS PRO FALL
+            ROW 1 — ZEITERSPARNIS + KOSTENERSPARNIS
            ═══════════════════════════════════════ */}
-        <div className="hb-card">
-          <FigLabel>{t.figure51}</FigLabel>
-          <h3 className="text-lg font-light mb-6 mt-2">{t.timeSavingsPerCase}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="hb-card">
+
+            <h3 className="text-lg font-light mb-6 mt-2">{t.timeSavingsPerCase}</h3>
+            <div className="space-y-5">
+              <div className="border-l-2 border-l-hb-ink pl-6">
+                <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.mitarbeiterMinSaved}</h4>
+                <p className="text-3xl font-display text-hb-ink">{perCase.mitarbeiterMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
+                <p className="text-xs text-hb-gray/60 mt-1 font-mono">
+                  {stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Mitarbeiter').reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                </p>
+              </div>
+              <div className="border-l-2 border-l-hb-line pl-6">
+                <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.buergerMinSaved}</h4>
+                <p className="text-3xl font-display text-hb-ink">{perCase.buergerMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
+                <p className="text-xs text-hb-gray/60 mt-1 font-mono">
+                  {stepDurations.filter(s => s.actor === 'Bürger').reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Bürger').reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="hb-card">
+
+            <h3 className="text-lg font-light mb-6 mt-2">{t.costSavingsPerCase}</h3>
             <div className="border-l-2 border-l-hb-ink pl-6">
-              <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.mitarbeiterMinSaved}</h4>
-              <p className="text-3xl font-display text-hb-ink">{perCase.mitarbeiterMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
-              <p className="text-xs text-hb-gray/60 mt-1 font-mono">
-                {stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((a, s) => a + s.actual, 0)} min (analog)
+              <p className="text-4xl font-display text-hb-ink">{perCase.costSavedPerCase.toFixed(2)} <span className="text-lg text-hb-gray font-light">€</span></p>
+              <p className="text-xs text-hb-gray mt-2 font-light">
+                = ({perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) &times; {hourlyRate} {t.eurPerHour}
               </p>
             </div>
-            <div className="border-l-2 border-l-hb-line pl-6">
-              <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.buergerMinSaved}</h4>
-              <p className="text-3xl font-display text-hb-ink">{perCase.buergerMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
-              <p className="text-xs text-hb-gray/60 mt-1 font-mono">
-                {stepDurations.filter(s => s.actor === 'Bürger').reduce((a, s) => a + s.actual, 0)} min (analog)
-              </p>
+            <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
+              <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+              <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.costSavingsPerCaseNote}</p>
             </div>
           </div>
         </div>
 
         {/* ═══════════════════════════════════════
-            SECTION 3 — KOSTENERSPARNIS PRO FALL
+            ROW 2 — BREAK-EVEN + ROI
            ═══════════════════════════════════════ */}
-        <div className="hb-card">
-          <FigLabel>{t.figure52}</FigLabel>
-          <h3 className="text-lg font-light mb-6 mt-2">{t.costSavingsPerCase}</h3>
-          <div className="border-l-2 border-l-hb-ink pl-6">
-            <p className="text-4xl font-display text-hb-ink">{perCase.costSavedPerCase.toFixed(2)} <span className="text-lg text-hb-gray font-light">€</span></p>
-            <p className="text-xs text-hb-gray mt-2 font-light">
-              = ({perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) &times; {hourlyRate} {t.eurPerHour}
-            </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="hb-card">
+            <h3 className="text-lg font-light mb-6">{t.breakEvenLabel}</h3>
+            {breakEven ? (
+              <div className="space-y-5">
+                <div className="border-l-2 border-l-hb-ink pl-6">
+                  <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.breakEvenDate}</h4>
+                  <p className="text-3xl font-display text-hb-ink">
+                    {formatMonthLabel(breakEven.month, language)}
+                  </p>
+                </div>
+                <div className="border-l-2 border-l-hb-line pl-6">
+                  <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.breakEvenDuration}</h4>
+                  <p className="text-3xl font-display text-hb-ink">
+                    {breakEven.monthsCount} <span className="text-lg text-hb-gray font-light">{t.months}</span>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-hb-gray font-light">{t.breakEvenNotReached}</p>
+            )}
+            <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
+              <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+              <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.breakEvenDesc}</p>
+            </div>
           </div>
-          <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
-            <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
-            <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.costSavingsPerCaseNote}</p>
+
+          <div className="hb-card">
+            <h3 className="text-lg font-light mb-6">{t.roiLabel}</h3>
+            {roi !== null && timeSeries.length > 0 ? (
+              <div className="space-y-5">
+                <div className="border-l-2 border-l-hb-ink pl-6">
+                  <p className="text-4xl font-display text-hb-ink">
+                    {roi.toFixed(1)} <span className="text-lg text-hb-gray font-light">%</span>
+                  </p>
+                </div>
+                <div className="border-l-2 border-l-hb-line pl-6">
+                  <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.roiPeriod}</h4>
+                  <p className="text-xl font-display text-hb-ink">
+                    {formatMonthLabel(timeSeries[0].month, language)} &ndash; {formatMonthLabel(timeSeries[timeSeries.length - 1].month, language)}
+                  </p>
+                  <p className="text-xs text-hb-gray mt-1 font-light">
+                    {timeSeries.length} {t.months}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-hb-gray font-light">{t.roiNotAvailable}</p>
+            )}
+            <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
+              <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+              <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.roiDesc}</p>
+            </div>
           </div>
         </div>
 
         {/* ═══════════════════════════════════════
-            SECTION 4 — KUMULIERTE EINSPARUNGSPROGNOSE (ZEIT)
+            SECTION 4a — EINSPARUNGSPROGNOSE (ZEIT) — monatlich
            ═══════════════════════════════════════ */}
         <div className="hb-card">
-          <FigLabel>{t.figure53}</FigLabel>
+
+          <h3 className="text-lg font-light mb-2 mt-2">{t.monthlyTimeTitle}</h3>
+
+          {timeSeries.length === 0 ? (
+            <div className="flex items-center gap-3 bg-hb-paper border border-hb-line p-4 mt-4 text-sm text-hb-gray font-light">
+              <Info size={16} className="flex-shrink-0" />
+              {t.noIntervalsWarning}
+            </div>
+          ) : (
+            <div id="chart-monthly-time" className="h-80 mt-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyTimeData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                  <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" />
+                  <Bar dataKey={t.monthlyBuergerH} fill="#999999" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* ═══════════════════════════════════════
+            SECTION 4b — KUMULIERTE EINSPARUNGSPROGNOSE (ZEIT)
+           ═══════════════════════════════════════ */}
+        <div className="hb-card">
+
           <h3 className="text-lg font-light mb-2 mt-2">{t.timeProjectionTitle}</h3>
 
           {timeSeries.length === 0 ? (
@@ -594,13 +895,14 @@ export const Results: React.FC = () => {
                 </button>
               </div>
 
-              <div className="h-80">
+              <div id="chart-cum-time" className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={timeChartData}>
+                  <LineChart data={timeChartData} margin={{ left: 10, right: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
                     <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
                       interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
-                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
                     <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
                     {showMitarbeiter && (
                       <Line type="monotone" dataKey={t.mitarbeiterHoursFreed} stroke="#111111" strokeWidth={2}
@@ -620,10 +922,45 @@ export const Results: React.FC = () => {
         </div>
 
         {/* ═══════════════════════════════════════
-            SECTION 5 — KUMULIERTE EINSPARUNGSPROGNOSE (EUR)
+            SECTION 5a — EINSPARUNGSPROGNOSE (EUR) — monatlich
            ═══════════════════════════════════════ */}
         <div className="hb-card">
-          <FigLabel>{t.figure40}</FigLabel>
+
+          <h3 className="text-lg font-light mb-2 mt-2">{t.monthlyEurTitle}</h3>
+
+          {timeSeries.length === 0 ? (
+            <div className="flex items-center gap-3 bg-hb-paper border border-hb-line p-4 mt-4 text-sm text-hb-gray font-light">
+              <Info size={16} className="flex-shrink-0" />
+              {t.noIntervalsWarning}
+            </div>
+          ) : (
+            <div id="chart-monthly-eur" className="h-80 mt-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyEurData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                    label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                  <Bar dataKey={t.monthlyNetSavings} fill="#111111" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <div className="flex items-start mt-4 pt-4 border-t border-hb-line/50">
+            <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+            <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.monthlyEurNote}</p>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════
+            SECTION 5b — KUMULIERTE EINSPARUNGSPROGNOSE (EUR)
+           ═══════════════════════════════════════ */}
+        <div className="hb-card">
+
           <h3 className="text-lg font-light mb-2 mt-2">{t.eurProjectionTitle}</h3>
 
           {timeSeries.length === 0 ? (
@@ -635,19 +972,30 @@ export const Results: React.FC = () => {
             <>
               {/* Summary line */}
               <p className="text-xs text-hb-gray font-light mt-2 mb-6">
-                {t.totalOneTimeCosts}: {totalOneTime.toLocaleString('de-DE')} € &middot; {t.totalAnnualCosts}: {totalAnnual.toLocaleString('de-DE')} € / Jahr
+                {t.totalOneTimeCosts}: {totalOneTime.toLocaleString(locale)} € &middot; {t.totalAnnualCosts}: {totalAnnual.toLocaleString(locale)} € / Jahr
               </p>
 
-              <div className="h-80">
+              <div id="chart-cum-eur" className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={eurChartData}>
+                  <LineChart data={eurChartData} margin={{ left: 10, right: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                    <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    <XAxis dataKey="idx" type="number" domain={[0, timeSeries.length - 1]}
+                      ticks={eurChartData.map(d => d.idx)}
+                      tickFormatter={(i: number) => eurChartData[i]?.month ?? ''}
+                      stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
                       interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
                     <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                      tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`} />
-                    <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" label={{ value: 'Break-Even', fill: '#666666', fontSize: 10, position: 'insideTopLeft' }} />
-                    <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })} />
+                      tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                      label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                    <ReferenceLine y={0} stroke="#666666" strokeWidth={1.5} strokeDasharray="6 3" />
+                    {breakEvenPoint && (
+                      <ReferenceDot x={breakEvenPoint.x} y={0}
+                        r={6} fill="#111111" stroke="#FFFFFF" strokeWidth={2}
+                        label={{ value: breakEvenPoint.label, fill: '#111111', fontSize: 10, fontWeight: 600, position: 'top', offset: 14 }} />
+                    )}
+                    <Tooltip {...tooltipStyle}
+                      labelFormatter={(i: number) => eurChartData[i]?.month ?? ''}
+                      formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
                     <Line type="monotone" dataKey={t.cumulativeNetSavings} stroke="#111111" strokeWidth={2}
                       dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
                       activeDot={{ r: 5, fill: '#111111' }} />
@@ -656,11 +1004,15 @@ export const Results: React.FC = () => {
               </div>
             </>
           )}
+          <div className="flex items-start mt-4 pt-4 border-t border-hb-line/50">
+            <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+            <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.cumulativeEurNote}</p>
+          </div>
         </div>
 
         {/* ── Navigation ── */}
         <div className="flex justify-between border-t border-hb-line/50 pt-8">
-          <button onClick={() => navigate('/process-parameters')} className="hb-btn-secondary flex items-center">
+          <button onClick={() => navigate(ROUTES.PROCESS_PARAMETERS)} className="hb-btn-secondary flex items-center">
             <ArrowLeft size={20} className="mr-2" />
             {t.back}
           </button>

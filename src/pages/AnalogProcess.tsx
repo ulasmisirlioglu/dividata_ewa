@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../store/useStore';
+import { useStore, parseBpmnXml } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { BPMNEditor } from '../components/BPMNEditor';
 import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
+import { ROUTES } from '../lib/routes';
 import clsx from 'clsx';
-import { FigLabel } from '../components/Decorations';
+
 
 export const AnalogProcess: React.FC = () => {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export const AnalogProcess: React.FC = () => {
     bpmnXml, setBpmnXml,
     stepDurations, setStepDuration, setStepActor,
     salaryGroup, setSalaryGroup,
-    salaryRates, setSalaryRate,
+    hourlyRate, setHourlyRate,
   } = useStore();
   const { t } = useLangStore();
 
@@ -29,7 +30,7 @@ export const AnalogProcess: React.FC = () => {
     if (currentStep < 3) {
       setCurrentStep(currentStep + 1);
     } else {
-      navigate('/ewa-evaluation');
+      navigate(ROUTES.EVALUATION);
     }
   };
 
@@ -37,7 +38,7 @@ export const AnalogProcess: React.FC = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      navigate('/dashboard');
+      navigate(ROUTES.DASHBOARD);
     }
   };
 
@@ -68,7 +69,6 @@ export const AnalogProcess: React.FC = () => {
           {currentStep === 1 && (
             <div className="animate-fade-in">
               <div className="mb-6">
-                <FigLabel>{t.figure20}</FigLabel>
                 <h2 className="text-3xl font-light mb-2">{t.mapProcessHeading}</h2>
                 <p className="text-hb-gray font-light">{t.mapProcessDesc}</p>
               </div>
@@ -79,14 +79,17 @@ export const AnalogProcess: React.FC = () => {
             </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 2 && (() => {
+            const { validTasks, excludedTasks } = parseBpmnXml(bpmnXml);
+            const validIds = new Set(validTasks.map((t) => t.id));
+            const filteredSteps = stepDurations.filter((s) => validIds.has(s.id));
+            return (
             <div className="max-w-4xl animate-fade-in">
               <div className="mb-8">
-                <FigLabel>{t.figure21}</FigLabel>
                 <h2 className="text-3xl font-light mb-2">{t.stepDurationsHeading}</h2>
                 <p className="text-hb-gray font-light">{t.stepDurationsDesc}</p>
               </div>
-              
+
               <div className="hb-card overflow-hidden p-0">
                 <table className="min-w-full">
                   <thead>
@@ -97,7 +100,7 @@ export const AnalogProcess: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-hb-line">
-                    {stepDurations.map((step) => (
+                    {filteredSteps.map((step) => (
                       <tr key={step.id} className="hover:bg-hb-paper transition-colors">
                         <td className="hb-table-cell px-6 font-medium">{step.name}</td>
                         <td className="hb-table-cell px-6">
@@ -111,7 +114,7 @@ export const AnalogProcess: React.FC = () => {
                                   : 'bg-transparent text-hb-gray hover:bg-hb-paper'
                               )}
                             >
-                              Mitarbeiter
+                              {t.employeeLabel}
                             </button>
                             <button
                               onClick={() => setStepActor(step.id, 'Bürger')}
@@ -122,7 +125,7 @@ export const AnalogProcess: React.FC = () => {
                                   : 'bg-transparent text-hb-gray hover:bg-hb-paper'
                               )}
                             >
-                              Bürger
+                              {t.citizenLabel}
                             </button>
                           </div>
                         </td>
@@ -140,19 +143,28 @@ export const AnalogProcess: React.FC = () => {
                     <tr className="bg-hb-paper font-semibold">
                       <td className="hb-table-cell px-6" colSpan={2}>{t.totalDuration}</td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
-                        {stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} Mitarbeiter-Min. + {stepDurations.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} Bürger-Min.
+                        {filteredSteps.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin} + {filteredSteps.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+
+              {excludedTasks.length > 0 && (
+                <div className="flex items-start gap-2 mt-4 px-1 text-xs text-hb-gray">
+                  <Info size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    {t.excludedTasksNote} <span className="font-medium">{excludedTasks.map(et => et.name).join(', ')}</span>
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+            );
+          })()}
 
           {currentStep === 3 && (
             <div className="max-w-2xl animate-fade-in">
                <div className="mb-8">
-                <FigLabel>{t.figure22}</FigLabel>
                 <h2 className="text-3xl font-light mb-2">{t.parametersTitle}</h2>
                 <p className="text-hb-gray font-light">{t.parametersDesc}</p>
               </div>
@@ -162,43 +174,29 @@ export const AnalogProcess: React.FC = () => {
                   <label className="block text-xs font-medium text-hb-gray uppercase tracking-wider mb-6">
                     {t.tariffGroup}
                   </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    {['TVöD EG 5', 'TVöD EG 6', 'TVöD EG 7', 'TVöD EG 8'].map((group) => (
-                      <label key={group} className={clsx(
-                        "flex items-center justify-between p-4 border cursor-pointer transition-all duration-200",
-                        salaryGroup === group
-                          ? "border-hb-ink bg-hb-paper"
-                          : "border-hb-line hover:border-hb-gray"
-                      )}>
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            name="salaryGroup"
-                            checked={salaryGroup === group}
-                            onChange={() => setSalaryGroup(group)}
-                            className="hidden"
-                          />
-                          <div className={clsx(
-                            "w-4 h-4 rounded-full border mr-3 flex items-center justify-center",
-                             salaryGroup === group ? "border-hb-ink" : "border-hb-gray"
-                          )}>
-                            {salaryGroup === group && <div className="w-2 h-2 rounded-full bg-hb-ink" />}
-                          </div>
-                          <span className="text-sm font-light">{group}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            min="0"
-                            value={salaryRates[group] || ''}
-                            onChange={(e) => { e.stopPropagation(); setSalaryRate(group, parseFloat(e.target.value) || 0); }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-transparent border-b border-hb-line w-14 text-right focus:border-hb-ink focus:outline-none text-sm transition-colors"
-                          />
-                          <span className="text-xs text-hb-gray">{t.eurPerHour}</span>
-                        </div>
-                      </label>
-                    ))}
+                  <div className="flex items-center gap-6 p-4 border border-hb-line">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-light">TVöD EG</span>
+                      <input
+                        type="text"
+                        value={salaryGroup}
+                        onChange={(e) => setSalaryGroup(e.target.value)}
+                        className="bg-transparent border-b border-hb-line w-16 text-center focus:border-hb-ink focus:outline-none text-sm transition-colors"
+                        placeholder=""
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 ml-6">
+                      <span className="text-sm font-light">{t.hourlyWageLabel}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={hourlyRate || ''}
+                        onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)}
+                        className="bg-transparent border-b border-hb-line w-16 text-right focus:border-hb-ink focus:outline-none text-sm transition-colors"
+                        placeholder=""
+                      />
+                      <span className="text-xs text-hb-gray">{t.eurPerHour}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -207,8 +205,8 @@ export const AnalogProcess: React.FC = () => {
               {/* Cost calculation */}
               {(() => {
                 const mitarbeiterMin = stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0);
-                const hourlyRate = salaryRates[salaryGroup] || 0;
-                const costPerProcess = (mitarbeiterMin / 60) * hourlyRate;
+                const rate = hourlyRate || 0;
+                const costPerProcess = (mitarbeiterMin / 60) * rate;
                 return (
                   <div className="hb-card mt-6 p-6">
                     <label className="block text-xs font-medium text-hb-gray uppercase tracking-wider mb-4">
@@ -220,7 +218,7 @@ export const AnalogProcess: React.FC = () => {
                         <span className="text-sm text-hb-gray ml-2">€</span>
                       </div>
                       <div className="text-xs text-hb-gray font-light pb-2">
-                        = {mitarbeiterMin} Min. &times; {hourlyRate} € / 60
+                        = {mitarbeiterMin} {t.minUnit} &times; {rate} {t.formulaEurPer60}
                       </div>
                     </div>
                   </div>

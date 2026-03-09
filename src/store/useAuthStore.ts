@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       });
 
       if (error) {
-        set({ loading: false, error: 'Anmeldefehler. Bitte versuchen Sie es erneut.' });
+        set({ loading: false, error: 'authErrorGeneral' });
         return;
       }
 
@@ -70,10 +70,10 @@ export const useAuthStore = create<AuthState>((set) => ({
           loading: false,
         });
       } else {
-        set({ loading: false, error: 'Ungültige Anmeldedaten. Bitte überprüfen Sie Stadtname und Passwort.' });
+        set({ loading: false, error: 'authErrorInvalid' });
       }
     } catch {
-      set({ loading: false, error: 'Anmeldefehler. Bitte versuchen Sie es erneut.' });
+      set({ loading: false, error: 'authErrorGeneral' });
     }
   },
 

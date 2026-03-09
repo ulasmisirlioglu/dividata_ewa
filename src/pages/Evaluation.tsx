@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../store/useStore';
+import { useStore, parseBpmnXml } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
-import { FigLabel } from '../components/Decorations';
+import { ROUTES } from '../lib/routes';
 import clsx from 'clsx';
 
 export const Evaluation: React.FC = () => {
   const navigate = useNavigate();
-  const { digitalSteps, setDigitalStep, stepDurations, digitalizationCosts, setDigitalizationCosts, salaryGroup, salaryRates } = useStore();
-  const { t } = useLangStore();
+  const { digitalSteps, setDigitalStep, stepDurations, digitalizationCosts, setDigitalizationCosts, hourlyRate, bpmnXml } = useStore();
+  const { t, language } = useLangStore();
+  const locale = language === 'de' ? 'de-DE' : 'en-US';
 
   const [currentStep, setCurrentStep] = useState(1);
 
@@ -22,7 +23,7 @@ export const Evaluation: React.FC = () => {
     if (currentStep < 2) {
       setCurrentStep(currentStep + 1);
     } else {
-      navigate('/process-parameters');
+      navigate(ROUTES.PROCESS_PARAMETERS);
     }
   };
 
@@ -30,7 +31,7 @@ export const Evaluation: React.FC = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     } else {
-      navigate('/analog-process');
+      navigate(ROUTES.ANALOG_PROCESS);
     }
   };
 
@@ -45,7 +46,6 @@ export const Evaluation: React.FC = () => {
   };
 
   // Calculate digital Mitarbeiterkosten pro Prozess
-  const hourlyRate = salaryRates[salaryGroup] || 0;
   const digitalMitarbeiterMin = digitalSteps.reduce((acc, s) => {
     const step = stepDurations.find(sd => sd.id === s.id);
     if (!step || step.actor !== 'Mitarbeiter') return acc;
@@ -89,10 +89,14 @@ export const Evaluation: React.FC = () => {
         </div>
 
         <div className="min-h-[600px] flex flex-col">
-          {currentStep === 1 && (
+          {currentStep === 1 && (() => {
+            const { validTasks, excludedTasks } = parseBpmnXml(bpmnXml);
+            const validIds = new Set(validTasks.map((t) => t.id));
+            const filteredDigital = digitalSteps.filter((s) => validIds.has(s.id));
+            const filteredAnalog = stepDurations.filter((s) => validIds.has(s.id));
+            return (
             <div className="animate-fade-in">
               <div className="mb-10">
-                <FigLabel>{t.figure30}</FigLabel>
                 <h1 className="text-4xl font-light mb-4">{t.evalTitle}</h1>
                 <p className="text-hb-gray text-lg font-light max-w-3xl leading-relaxed">
                   {t.evalDesc}
@@ -129,7 +133,7 @@ export const Evaluation: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-hb-line">
-                    {digitalSteps.map((step) => {
+                    {filteredDigital.map((step) => {
                       const analogTime = getAnalogDuration(step.id);
                       return (
                         <tr key={step.id} className="hover:bg-hb-paper transition-colors">
@@ -154,9 +158,10 @@ export const Evaluation: React.FC = () => {
                             <input
                               type="number"
                               min="0"
-                              value={step.digitalDuration}
+                              value={step.digitalDuration || ''}
                               onChange={(e) => setDigitalStep(step.id, { digitalDuration: parseFloat(e.target.value) || 0 })}
-                              className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors"
+                              placeholder="—"
+                              className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors placeholder:text-hb-gray/40"
                             />
                           </td>
                         </tr>
@@ -173,24 +178,33 @@ export const Evaluation: React.FC = () => {
                     </tr>
                     <tr className="bg-hb-paper border-t border-hb-line/50">
                       <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
-                        {stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} Mitarbeiter-Min.<br/>
-                        + {stepDurations.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} Bürger-Min.
+                        {filteredAnalog.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin}<br/>
+                        + {filteredAnalog.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
                       </td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink font-medium whitespace-nowrap">
-                        {digitalSteps.filter(s => getActor(s.id) === 'Mitarbeiter').reduce((acc, s) => acc + s.digitalDuration, 0)} Mitarbeiter-Min.<br/>
-                        + {digitalSteps.filter(s => getActor(s.id) === 'Bürger').reduce((acc, s) => acc + s.digitalDuration, 0)} Bürger-Min.
+                        {filteredDigital.filter(s => getActor(s.id) === 'Mitarbeiter').reduce((acc, s) => acc + s.digitalDuration, 0)} {t.employeeMin}<br/>
+                        + {filteredDigital.filter(s => getActor(s.id) === 'Bürger').reduce((acc, s) => acc + s.digitalDuration, 0)} {t.citizenMin}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
+
+              {excludedTasks.length > 0 && (
+                <div className="flex items-start gap-2 mt-4 px-1 text-xs text-hb-gray">
+                  <Info size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    {t.excludedTasksNote} <span className="font-medium">{excludedTasks.map(et => et.name).join(', ')}</span>
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+            );
+          })()}
 
           {currentStep === 2 && (
             <div className="max-w-4xl animate-fade-in">
               <div className="mb-10">
-                <FigLabel>{t.figure35}</FigLabel>
                 <h1 className="text-4xl font-light mb-4">{t.costsTitle}</h1>
                 <p className="text-hb-gray text-lg font-light max-w-3xl leading-relaxed">
                   {t.costsDesc}
@@ -210,10 +224,10 @@ export const Evaluation: React.FC = () => {
                 <div className="flex items-end gap-8">
                   <div>
                     <span className="text-4xl font-light text-hb-ink">{digitalPersonnelCostPerProcess.toFixed(2)}</span>
-                    <span className="text-sm text-hb-gray ml-2">€ / Prozess</span>
+                    <span className="text-sm text-hb-gray ml-2">{t.eurPerProcess}</span>
                   </div>
                   <div className="text-xs text-hb-gray font-light pb-2">
-                    = {digitalMitarbeiterMin.toFixed(1)} Min. &times; {hourlyRate} € / 60
+                    = {digitalMitarbeiterMin.toFixed(1)} {t.minUnit} &times; {hourlyRate} {t.formulaEurPer60}
                   </div>
                 </div>
               </div>
@@ -280,7 +294,7 @@ export const Evaluation: React.FC = () => {
                         <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.annualLabel}</span>
                       </td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
-                        {totalAnnual.toLocaleString('de-DE')} € + {t.digitalPersonnelCost}
+                        {totalAnnual.toLocaleString(locale)} € + {t.digitalPersonnelCost}
                       </td>
                     </tr>
                     <tr className="bg-hb-paper border-t border-hb-line">
@@ -289,7 +303,7 @@ export const Evaluation: React.FC = () => {
                         <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.oneTimeLabel}</span>
                       </td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
-                        {totalOneTime.toLocaleString('de-DE')} €
+                        {totalOneTime.toLocaleString(locale)} €
                       </td>
                     </tr>
                   </tfoot>

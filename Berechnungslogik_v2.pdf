@@ -1,0 +1,541 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2799999999999727 841.8899999999999864]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 7062
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+0 g
+153.1877952755905596 785.1970866141732586 Td
+(Berechnungslogik - DiviData eWA) Tj
+ET
+BT
+/F1 9 Tf
+10.3499999999999996 TL
+0 g
+212.9927952755905665 765.3545669291338527 Td
+(Dokumentation zur Validierung  |  9.3.2026) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+56.6929133858267775 737.0081102362204319 Td
+(1. Analoge Kosten pro Vorgang) Tj
+ET
+0.8503937007874016 w
+56.6929133858267775 725.6695275590550409 m
+538.5826771653544256 725.6695275590550409 l
+S
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 708.6616535433070112 Td
+(Nur Mitarbeiter-Zeit erzeugt Personalkosten. Buerger-Zeit wird zeitlich erfasst, kostet aber nichts.) Tj
+ET
+0.96 g
+56.6929133858267775 700.1577165354329964 481.8897637795275841 -34.0157480314960665 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 690.2364566929134071 Td
+(Mitarbeiter-Minuten = Summe aller Schrittdauern \(nur Mitarbeiter\)) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 677.480551181102328 Td
+(Kosten pro Vorgang  = \(Mitarbeiter-Minuten / 60\) x Stundensatz) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 656.2207086614173477 Td
+(Beispiel: 12 Min. Mitarbeiter-Zeit, EG 6 \(48 EUR/Std.\) -> \(12/60\) x 48 = 9,60 EUR) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+56.6929133858267775 637.7955118110235162 Td
+(2. Ersparnis pro digitalem Fall) Tj
+ET
+0.8503937007874016 w
+56.6929133858267775 626.4569291338582389 m
+538.5826771653544256 626.4569291338582389 l
+S
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 609.4490551181102092 Td
+(Fuer jeden Schritt: Ersparnis = Analoge Dauer - Digitale Dauer. Getrennt nach Mitarbeiter und Buerger) Tj
+T* (aufsummiert. Die digitale Restzeit ist bereits in der Differenz enthalten, daher keine separate Beruecksichtigung.) Tj
+ET
+0.96 g
+56.6929133858267775 588.1892125984251152 481.8897637795275841 -46.7716535433070888 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 578.2679527559055259 Td
+(MA-Minuten gespart = Summe\(Analog - Digital\) fuer Mitarbeiter) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 565.5120472440944468 Td
+(BG-Minuten gespart = Summe\(Analog - Digital\) fuer Buerger) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 552.7561417322833677 Td
+(EUR pro Fall       = \(MA-Minuten gespart / 60\) x Stundensatz) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+56.6929133858267775 531.4962992125983874 Td
+(3. Monatliche Einsparung \(nicht-kumulativ\)) Tj
+ET
+0.8503937007874016 w
+56.6929133858267775 520.1577165354329964 m
+538.5826771653544256 520.1577165354329964 l
+S
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 503.1498425196849666 Td
+(Pro Monat bestimmt das Intervall, wie viele Faelle \(Volumen\) mit welcher Digitalisierungsquote verarbeitet werden:) Tj
+ET
+0.96 g
+56.6929133858267775 494.6459055118109518 481.8897637795275841 -85.0393700787401627 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 484.7246456692913057 Td
+(Q = Digitalisierungsquote / 100) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 471.9687401574802834 Td
+(V = Fallvolumen pro Monat) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 446.4569291338582389 Td
+(MA-Stunden gespart = V x Q x MA-Min.gespart / 60) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 433.7010236220471597 Td
+(BG-Stunden gespart = V x Q x BG-Min.gespart / 60) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 420.9451181102361375 Td
+(EUR Ersparnis      = V x Q x \(MA-Min.gespart / 60\) x Stundensatz) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 399.6852755905511003 Td
+(Jaehrliche Kosten \(Lizenz + Wartung + Sonstige\) werden durch 12 geteilt und jeden Monat abgezogen:) Tj
+ET
+0.96 g
+56.6929133858267775 391.1813385826770855 481.8897637795275841 -21.2598425196850407 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 381.2600787401574394 Td
+(Monatl. Netto = EUR Ersparnis - \(Jaehrliche Kosten / 12\)) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 360.0002362204724022 Td
+(Einmalige Kosten sind hier NICHT enthalten - sie erscheinen nur im kumulativen Wert.) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+56.6929133858267775 341.5750393700786844 Td
+(4. Kumulative Einsparung) Tj
+ET
+0.8503937007874016 w
+56.6929133858267775 330.2364566929132934 m
+538.5826771653544256 330.2364566929132934 l
+S
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 313.2285826771652637 Td
+(Startwert ist negativ \(= einmalige Investition\). Dann wird jeden Monat die Netto-Ersparnis addiert:) Tj
+ET
+0.96 g
+56.6929133858267775 304.7246456692912489 481.8897637795275841 -59.5275590551181182 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 294.8033858267715459 Td
+(Start:    Kum. EUR = -\(Implementierung + Schulung\)) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 282.0474803149605805 Td
+(Pro Monat: Kum. EUR += Monatl. Netto) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 256.5356692913385359 Td
+(Break-even = Monat, in dem Kum. EUR >= 0) Tj
+ET
+BT
+/F1 9.5 Tf
+10.9249999999999989 TL
+0 g
+56.6929133858267775 232.4411811023621794 Td
+(Beispiel: Einmalig 15.000 EUR, jaehrlich 6.000 EUR \(500/Monat\), monatl. Ersparnis 2.000 EUR:) Tj
+ET
+0.96 g
+56.6929133858267775 223.9372440944881077 481.8897637795275841 -85.0393700787401627 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 214.0159842519684616 Td
+(Start:    -15.000 EUR) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 201.2600787401573825 Td
+(Monat 1:  -15.000 + 2.000 - 500 = -13.500) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 188.5041732283464171 Td
+(Monat 2:  -13.500 + 2.000 - 500 = -12.000) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 175.748267716535338 Td
+(...) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 162.9923622047243725 Td
+(Monat 10: -1.500 + 2.000 - 500  =  0  <- Break-even) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 150.2364566929132934 Td
+(Monat 11:  0 + 2.000 - 500      = +1.500) Tj
+ET
+BT
+/F2 13 Tf
+14.9499999999999993 TL
+0 g
+56.6929133858267775 128.9766141732283131 Td
+(5. Zusammenfassung Kostenbehandlung) Tj
+ET
+0.8503937007874016 w
+56.6929133858267775 117.6380314960628937 m
+538.5826771653544256 117.6380314960628937 l
+S
+0.96 g
+56.6929133858267775 110.5514173228345385 481.8897637795275841 -46.7716535433070888 re
+f
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 100.6301574803148924 Td
+(Einmalige Kosten:   Nur 1x als negativer Startwert \(kumulativ\)) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 87.8742519685038133 Td
+(Jaehrliche Kosten:  /12, jeden Monat abgezogen \(monatl. + kumulativ\)) Tj
+ET
+BT
+/F5 9.5 Tf
+10.9249999999999989 TL
+0 g
+62.3622047244094517 75.1183464566928478 Td
+(Dig. Personalkosten: Nicht separat - bereits in der Differenz enthalten) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 2.5.2)
+/CreationDate (D:20260309185953+01'00')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000007266 00000 n 
+0000009083 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000007323 00000 n 
+0000007448 00000 n 
+0000007578 00000 n 
+0000007711 00000 n 
+0000007848 00000 n 
+0000007971 00000 n 
+0000008100 00000 n 
+0000008232 00000 n 
+0000008368 00000 n 
+0000008496 00000 n 
+0000008623 00000 n 
+0000008752 00000 n 
+0000008885 00000 n 
+0000008987 00000 n 
+0000009331 00000 n 
+0000009417 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <537AF1E796FDE352218553928BE4E189> <537AF1E796FDE352218553928BE4E189> ]
+>>
+startxref
+9521
+%%EOF

@@ -23,7 +23,7 @@ export const initialBpmnXml = `<?xml version="1.0" encoding="UTF-8"?>
         <bpmn:flowNodeRef>Task_2</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_3</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Sachbearbeiter" name="Sachbearbeiter:in">
+      <bpmn:lane id="Lane_Sachbearbeiter" name="kommunaler Mitarbeiter:in">
         <bpmn:flowNodeRef>Task_4</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_1</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_5</bpmn:flowNodeRef>

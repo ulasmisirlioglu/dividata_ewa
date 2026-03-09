@@ -1,60 +1,104 @@
-export interface StepDurationRecord {
-  id: string;
-  name: string;
-  suggested: number;
-  actual: number;
-}
+import type { StepDuration, DigitalStep, ProcessInterval } from '../store/useStore';
 
-export interface DigitalStepRecord {
+export interface ProjectRow {
   id: string;
-  name: string;
-  digitalReplacement: string;
-  digitalizationPercent: number;
-  digitalDuration: number;
+  user_id: string;
+  stadtname: string;
+  use_case: string;
+  project_name: string;
+  bpmn_xml: string | null;
+  step_durations: StepDuration[] | null;
+  salary_group: string | null;
+  hourly_rate: number | null;
+  analog_cost_per_process: number | null;
+  digital_steps: DigitalStep[] | null;
+  analog_mitarbeiter_minutes: number | null;
+  analog_buerger_minutes: number | null;
+  digital_mitarbeiter_minutes: number | null;
+  digital_buerger_minutes: number | null;
+  digital_personnel_cost: number | null;
+  license_cost_year: number | null;
+  maintenance_cost_year: number | null;
+  other_cost_year: number | null;
+  implementation_cost: number | null;
+  training_cost: number | null;
+  yearly_total_cost: number | null;
+  onetime_total_cost: number | null;
+  process_intervals: ProcessInterval[] | null;
+  mitarbeiter_minutes_saved_per_case: number | null;
+  buerger_minutes_saved_per_case: number | null;
+  cost_saving_per_case: number | null;
+  breakeven_point: string | null;
+  roi: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Database {
   public: {
     Tables: {
       projects: {
-        Row: {
-          id: string;
-          user_id: string;
-          municipality_name: string;
-          use_case: string;
-          bpmn_xml: string;
-          step_durations: StepDurationRecord[];
-          digital_steps: DigitalStepRecord[];
-          salary_group: string;
-          monthly_volume: number;
-          created_at: string;
-          updated_at: string;
-        };
+        Row: ProjectRow;
         Insert: {
           id?: string;
           user_id: string;
-          municipality_name: string;
+          stadtname: string;
           use_case: string;
-          bpmn_xml: string;
-          step_durations?: StepDurationRecord[];
-          digital_steps?: DigitalStepRecord[];
-          salary_group?: string;
-          monthly_volume?: number;
-          created_at?: string;
-          updated_at?: string;
+          project_name: string;
+          bpmn_xml?: string | null;
+          step_durations?: unknown;
+          salary_group?: string | null;
+          hourly_rate?: number | null;
+          analog_cost_per_process?: number | null;
+          digital_steps?: unknown;
+          analog_mitarbeiter_minutes?: number | null;
+          analog_buerger_minutes?: number | null;
+          digital_mitarbeiter_minutes?: number | null;
+          digital_buerger_minutes?: number | null;
+          digital_personnel_cost?: number | null;
+          license_cost_year?: number | null;
+          maintenance_cost_year?: number | null;
+          other_cost_year?: number | null;
+          implementation_cost?: number | null;
+          training_cost?: number | null;
+          yearly_total_cost?: number | null;
+          onetime_total_cost?: number | null;
+          process_intervals?: unknown;
+          mitarbeiter_minutes_saved_per_case?: number | null;
+          buerger_minutes_saved_per_case?: number | null;
+          cost_saving_per_case?: number | null;
+          breakeven_point?: string | null;
+          roi?: number | null;
         };
         Update: {
-          id?: string;
           user_id?: string;
-          municipality_name?: string;
+          stadtname?: string;
           use_case?: string;
-          bpmn_xml?: string;
-          step_durations?: StepDurationRecord[];
-          digital_steps?: DigitalStepRecord[];
-          salary_group?: string;
-          monthly_volume?: number;
-          created_at?: string;
-          updated_at?: string;
+          project_name?: string;
+          bpmn_xml?: string | null;
+          step_durations?: unknown;
+          salary_group?: string | null;
+          hourly_rate?: number | null;
+          analog_cost_per_process?: number | null;
+          digital_steps?: unknown;
+          analog_mitarbeiter_minutes?: number | null;
+          analog_buerger_minutes?: number | null;
+          digital_mitarbeiter_minutes?: number | null;
+          digital_buerger_minutes?: number | null;
+          digital_personnel_cost?: number | null;
+          license_cost_year?: number | null;
+          maintenance_cost_year?: number | null;
+          other_cost_year?: number | null;
+          implementation_cost?: number | null;
+          training_cost?: number | null;
+          yearly_total_cost?: number | null;
+          onetime_total_cost?: number | null;
+          process_intervals?: unknown;
+          mitarbeiter_minutes_saved_per_case?: number | null;
+          buerger_minutes_saved_per_case?: number | null;
+          cost_saving_per_case?: number | null;
+          breakeven_point?: string | null;
+          roi?: number | null;
         };
         Relationships: [];
       };

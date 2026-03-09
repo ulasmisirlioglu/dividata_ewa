@@ -154,6 +154,11 @@ interface Translation {
   buergerMinSaved: string;
   costSavingsPerCase: string;
   costSavingsPerCaseNote: string;
+  monthlyTimeTitle: string;
+  monthlyEurTitle: string;
+  monthlyMitarbeiterH: string;
+  monthlyBuergerH: string;
+  monthlyNetSavings: string;
   timeProjectionTitle: string;
   mitarbeiterHoursFreed: string;
   buergerHoursFreed: string;
@@ -163,8 +168,84 @@ interface Translation {
   figure51: string;
   figure52: string;
   figure53: string;
+  figure54: string;
+  figure55: string;
   digitalizationPercentHeader: string;
   noIntervalsWarning: string;
+  breakEvenLabel: string;
+  breakEvenDate: string;
+  breakEvenDuration: string;
+  breakEvenNotReached: string;
+  breakEvenDesc: string;
+  months: string;
+  roiLabel: string;
+  roiPeriod: string;
+  roiDesc: string;
+  roiNotAvailable: string;
+  monthlyEurNote: string;
+  cumulativeEurNote: string;
+  resultsBpmnProcess: string;
+  editBpmn: string;
+  hourlyWageLabel: string;
+  footerTagline: string;
+  footerDatenschutz: string;
+  footerImpressum: string;
+  footerClose: string;
+  navbarSubtitle: string;
+
+  // Actor labels
+  employeeLabel: string;
+  citizenLabel: string;
+  employeeMin: string;
+  citizenMin: string;
+
+  // Units & formulas
+  eurPerProcess: string;
+  hoursAxisLabel: string;
+  euroAxisLabel: string;
+  minUnit: string;
+  formulaEurPer60: string;
+
+  // Excluded tasks note
+  excludedTasksNote: string;
+
+  // Auth errors
+  authErrorGeneral: string;
+  authErrorInvalid: string;
+
+  // PDF labels
+  pdfConfidential: string;
+  pdfInputParams: string;
+  pdfStep: string;
+  pdfActor: string;
+  pdfMinLabel: string;
+  pdfDigPercent: string;
+  pdfDigMin: string;
+  pdfDigCosts: string;
+  pdfProcessIntervals: string;
+  pdfCasesMonth: string;
+  pdfEndBalance: string;
+
+  // Dashboard placeholder
+  projectNamePlaceholder: string;
+
+  // Interval labels
+  vonLabel: string;
+  bisLabel: string;
+  intervalLabel: string;
+
+  // Dashboard - Project dialog
+  dashboardYourProjects: string;
+  dashboardNewProject: string;
+  dashboardProjectName: string;
+  dashboardStartProject: string;
+  dashboardCreating: string;
+  dashboardDeleteConfirm: string;
+
+  // Save status
+  saveStatusSaving: string;
+  saveStatusSaved: string;
+  saveStatusError: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -311,6 +392,11 @@ const translations: Record<Language, Translation> = {
     buergerMinSaved: 'Bürger-Minuten eingespart',
     costSavingsPerCase: 'Kostenersparnis pro Fall',
     costSavingsPerCaseNote: 'Nur aus Mitarbeitersicht (kommunale Sicht). Einmalige Digitalisierungskosten sind nicht enthalten.',
+    monthlyTimeTitle: 'Einsparungsprognose (Zeit)',
+    monthlyEurTitle: 'Einsparungsprognose (EUR)',
+    monthlyMitarbeiterH: 'Mitarbeiterstunden / Monat',
+    monthlyBuergerH: 'Bürgerstunden / Monat',
+    monthlyNetSavings: 'Nettoeinsparung / Monat (€)',
     timeProjectionTitle: 'Kumulierte Einsparungsprognose (Zeit)',
     mitarbeiterHoursFreed: 'Freigesetzte Mitarbeiterstunden',
     buergerHoursFreed: 'Freigesetzte Bürgerstunden',
@@ -320,8 +406,75 @@ const translations: Record<Language, Translation> = {
     figure51: 'Abbildung 5.1',
     figure52: 'Abbildung 5.2',
     figure53: 'Abbildung 5.3',
+    figure54: 'Abbildung 5.4',
+    figure55: 'Abbildung 5.5',
     digitalizationPercentHeader: 'Digitalisierung %',
     noIntervalsWarning: 'Bitte definieren Sie mindestens ein gültiges Prozessintervall (mit Von, Bis, Volumen > 0).',
+    breakEvenLabel: 'Break-even-Punkt',
+    breakEvenDate: 'Zeitpunkt',
+    breakEvenDuration: 'Dauer bis Break-even',
+    breakEvenNotReached: 'Innerhalb des Prognosezeitraums nicht erreicht',
+    breakEvenDesc: 'Der Break-even-Punkt zeigt, ab wann die kumulierten Einsparungen die gesamten Investitionskosten (einmalige + laufende Kosten) übersteigen.',
+    months: 'Monate',
+    roiLabel: 'Return on Investment (ROI)',
+    roiPeriod: 'Prognosezeitraum',
+    roiDesc: 'Kumulierte Nettoeinsparung am Ende des Prognosezeitraums geteilt durch die Gesamtinvestition (einmalige Kosten + laufende Kosten über den gesamten Zeitraum).',
+    roiNotAvailable: 'Keine gültigen Intervalle definiert',
+    monthlyEurNote: 'Die monatliche Nettoeinsparung enthält die jährlichen Kosten (Lizenz, Wartung, Sonstige), die anteilig durch 12 abgezogen werden. Einmalige Kosten (Implementierung, Schulung) sind hier nicht enthalten — diese fließen nur in die kumulative Berechnung ein.',
+    cumulativeEurNote: 'Die kumulierte Nettoeinsparung beginnt mit den einmaligen Kosten (Implementierung + Schulung) als negativem Startwert. Jeden Monat wird die Einsparung addiert und die jährlichen Kosten anteilig (/12) abgezogen. Der Break-even-Punkt markiert den Monat, ab dem die Kurve positiv wird.',
+    resultsBpmnProcess: 'Prozessmodell (BPMN)',
+    editBpmn: 'Bearbeiten',
+    hourlyWageLabel: 'Stundenlohn',
+    footerTagline: 'Messbare Digitalisierung für Kommunen',
+    footerDatenschutz: 'Datenschutzerklärung',
+    footerImpressum: 'Impressum',
+    footerClose: 'Schließen',
+    navbarSubtitle: 'Öffentlicher Sektor ROI v1.0',
+
+    employeeLabel: 'Mitarbeiter',
+    citizenLabel: 'Bürger',
+    employeeMin: 'Mitarbeiter-Min.',
+    citizenMin: 'Bürger-Min.',
+
+    eurPerProcess: '€ / Prozess',
+    hoursAxisLabel: 'Stunden (h)',
+    euroAxisLabel: 'Euro (€)',
+    minUnit: 'Min.',
+    formulaEurPer60: '€ / 60',
+
+    excludedTasksNote: 'Nicht berechnet (Abbruch-Pfad):',
+
+    authErrorGeneral: 'Anmeldefehler. Bitte versuchen Sie es erneut.',
+    authErrorInvalid: 'Ungültige Anmeldedaten. Bitte überprüfen Sie Stadtname und Passwort.',
+
+    pdfConfidential: 'DiviData  |  Vertraulich',
+    pdfInputParams: 'Eingabeparameter',
+    pdfStep: 'Schritt',
+    pdfActor: 'Akteur',
+    pdfMinLabel: 'Min.',
+    pdfDigPercent: 'Dig. %',
+    pdfDigMin: 'Dig. Min.',
+    pdfDigCosts: 'Digitalisierungskosten',
+    pdfProcessIntervals: 'Prozessintervalle',
+    pdfCasesMonth: 'Fälle/Monat',
+    pdfEndBalance: 'Endsaldo',
+
+    projectNamePlaceholder: 'z.B. eWA_Pilotphase',
+
+    vonLabel: 'von',
+    bisLabel: 'bis',
+    intervalLabel: 'Intervall',
+
+    dashboardYourProjects: 'Ihre Projekte',
+    dashboardNewProject: 'Neues Projekt',
+    dashboardProjectName: 'Projektname',
+    dashboardStartProject: 'Projekt starten',
+    dashboardCreating: 'Erstellen...',
+    dashboardDeleteConfirm: 'Projekt wirklich löschen?',
+
+    saveStatusSaving: 'Speichern...',
+    saveStatusSaved: 'Gespeichert',
+    saveStatusError: 'Speicherfehler',
   },
   en: {
     navDashboard: 'Dashboard',
@@ -466,6 +619,11 @@ const translations: Record<Language, Translation> = {
     buergerMinSaved: 'Citizen Minutes Saved',
     costSavingsPerCase: 'Cost Savings per Case',
     costSavingsPerCaseNote: 'Employee costs only (municipal perspective). One-time digitalization costs are not included.',
+    monthlyTimeTitle: 'Savings Projection (Time)',
+    monthlyEurTitle: 'Savings Projection (EUR)',
+    monthlyMitarbeiterH: 'Employee Hours / Month',
+    monthlyBuergerH: 'Citizen Hours / Month',
+    monthlyNetSavings: 'Net Savings / Month (€)',
     timeProjectionTitle: 'Cumulative Savings Projection (Time)',
     mitarbeiterHoursFreed: 'Employee Hours Freed',
     buergerHoursFreed: 'Citizen Hours Freed',
@@ -475,8 +633,75 @@ const translations: Record<Language, Translation> = {
     figure51: 'Figure 5.1',
     figure52: 'Figure 5.2',
     figure53: 'Figure 5.3',
+    figure54: 'Figure 5.4',
+    figure55: 'Figure 5.5',
     digitalizationPercentHeader: 'Digitalization %',
     noIntervalsWarning: 'Please define at least one valid process interval (with From, To, Volume > 0).',
+    breakEvenLabel: 'Break-even Point',
+    breakEvenDate: 'Date',
+    breakEvenDuration: 'Time to Break-even',
+    breakEvenNotReached: 'Not reached within the forecast period',
+    breakEvenDesc: 'The break-even point shows when cumulative savings exceed total investment costs (one-time + ongoing costs).',
+    months: 'months',
+    roiLabel: 'Return on Investment (ROI)',
+    roiPeriod: 'Forecast Period',
+    roiDesc: 'Cumulative net savings at the end of the forecast period divided by total investment (one-time costs + ongoing costs over the entire period).',
+    roiNotAvailable: 'No valid intervals defined',
+    monthlyEurNote: 'Monthly net savings include annual costs (license, maintenance, other) deducted proportionally (/12). One-time costs (implementation, training) are not included here — they only appear in the cumulative calculation.',
+    cumulativeEurNote: 'Cumulative net savings start with one-time costs (implementation + training) as a negative initial value. Each month, savings are added and annual costs are deducted proportionally (/12). The break-even point marks the month when the curve turns positive.',
+    resultsBpmnProcess: 'Process Model (BPMN)',
+    editBpmn: 'Edit',
+    hourlyWageLabel: 'Hourly wage',
+    footerTagline: 'Measurable Digitalization for Municipalities',
+    footerDatenschutz: 'Privacy Policy',
+    footerImpressum: 'Legal Notice',
+    footerClose: 'Close',
+    navbarSubtitle: 'Public Sector ROI v1.0',
+
+    employeeLabel: 'Employee',
+    citizenLabel: 'Citizen',
+    employeeMin: 'Employee min.',
+    citizenMin: 'Citizen min.',
+
+    eurPerProcess: '€ / process',
+    hoursAxisLabel: 'Hours (h)',
+    euroAxisLabel: 'Euro (€)',
+    minUnit: 'min.',
+    formulaEurPer60: '€ / 60',
+
+    excludedTasksNote: 'Not calculated (abort path):',
+
+    authErrorGeneral: 'Sign-in error. Please try again.',
+    authErrorInvalid: 'Invalid credentials. Please check city name and password.',
+
+    pdfConfidential: 'DiviData  |  Confidential',
+    pdfInputParams: 'Input Parameters',
+    pdfStep: 'Step',
+    pdfActor: 'Actor',
+    pdfMinLabel: 'Min.',
+    pdfDigPercent: 'Dig. %',
+    pdfDigMin: 'Dig. Min.',
+    pdfDigCosts: 'Digitalization Costs',
+    pdfProcessIntervals: 'Process Intervals',
+    pdfCasesMonth: 'cases/mo',
+    pdfEndBalance: 'Final Balance',
+
+    projectNamePlaceholder: 'e.g. eWA_Pilot',
+
+    vonLabel: 'from',
+    bisLabel: 'to',
+    intervalLabel: 'Interval',
+
+    dashboardYourProjects: 'Your Projects',
+    dashboardNewProject: 'New Project',
+    dashboardProjectName: 'Project Name',
+    dashboardStartProject: 'Start Project',
+    dashboardCreating: 'Creating...',
+    dashboardDeleteConfirm: 'Really delete this project?',
+
+    saveStatusSaving: 'Saving...',
+    saveStatusSaved: 'Saved',
+    saveStatusError: 'Save Error',
   }
 };
 

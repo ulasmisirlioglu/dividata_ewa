@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { useLangStore } from '../store/useLangStore';
+import { ROUTES } from '../lib/routes';
 import { Layout } from '../components/Layout';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { ScribbleCircle } from '../components/Decorations';
@@ -24,7 +25,7 @@ export const Auth: React.FC = () => {
 
     const { isAuthenticated } = useAuthStore.getState();
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate(ROUTES.DASHBOARD);
     }
   };
 
@@ -80,7 +81,7 @@ export const Auth: React.FC = () => {
 
               {error && (
                 <div className="text-sm text-red-600 font-light bg-red-50 border border-red-200 p-4">
-                  {error}
+                  {(t as Record<string, string>)[error] ?? error}
                 </div>
               )}
 

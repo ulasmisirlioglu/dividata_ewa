@@ -4,23 +4,24 @@ import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
-import { FigLabel } from '../components/Decorations';
+import { ROUTES } from '../lib/routes';
+
 
 export const DigitalizationCosts: React.FC = () => {
   const navigate = useNavigate();
-  const { digitalizationCosts, setDigitalizationCosts, stepDurations, digitalSteps, salaryGroup, salaryRates } = useStore();
-  const { t } = useLangStore();
+  const { digitalizationCosts, setDigitalizationCosts, stepDurations, digitalSteps, hourlyRate } = useStore();
+  const { t, language } = useLangStore();
+  const locale = language === 'de' ? 'de-DE' : 'en-US';
 
   const handleNext = () => {
-    navigate('/results');
+    navigate(ROUTES.RESULTS);
   };
 
   const handleBack = () => {
-    navigate('/ewa-evaluation');
+    navigate(ROUTES.EVALUATION);
   };
 
   // Calculate digital Mitarbeiterkosten pro Prozess
-  const hourlyRate = salaryRates[salaryGroup] || 0;
   const digitalMitarbeiterMin = digitalSteps.reduce((acc, s) => {
     const step = stepDurations.find(sd => sd.id === s.id);
     if (!step || step.actor !== 'Mitarbeiter') return acc;
@@ -45,7 +46,6 @@ export const DigitalizationCosts: React.FC = () => {
     <Layout>
       <div className="max-w-4xl mx-auto animate-fade-in">
         <div className="mb-10">
-          <FigLabel>{t.figure35}</FigLabel>
           <h1 className="text-4xl font-light mb-4">{t.costsTitle}</h1>
           <p className="text-hb-gray text-lg font-light max-w-3xl leading-relaxed">
             {t.costsDesc}
@@ -65,10 +65,10 @@ export const DigitalizationCosts: React.FC = () => {
           <div className="flex items-end gap-8">
             <div>
               <span className="text-4xl font-light text-hb-ink">{digitalPersonnelCostPerProcess.toFixed(2)}</span>
-              <span className="text-sm text-hb-gray ml-2">€ / Prozess</span>
+              <span className="text-sm text-hb-gray ml-2">{t.eurPerProcess}</span>
             </div>
             <div className="text-xs text-hb-gray font-light pb-2">
-              = {digitalMitarbeiterMin.toFixed(1)} Min. &times; {hourlyRate} € / 60
+              = {digitalMitarbeiterMin.toFixed(1)} {t.minUnit} &times; {hourlyRate} {t.formulaEurPer60}
             </div>
           </div>
         </div>
@@ -135,7 +135,7 @@ export const DigitalizationCosts: React.FC = () => {
                   <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.annualLabel}</span>
                 </td>
                 <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
-                  {totalAnnual.toLocaleString('de-DE')} €
+                  {totalAnnual.toLocaleString(locale)} €
                 </td>
               </tr>
               <tr className="bg-hb-paper border-t border-hb-line">
@@ -144,7 +144,7 @@ export const DigitalizationCosts: React.FC = () => {
                   <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.oneTimeLabel}</span>
                 </td>
                 <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
-                  {totalOneTime.toLocaleString('de-DE')} €
+                  {totalOneTime.toLocaleString(locale)} €
                 </td>
               </tr>
             </tfoot>

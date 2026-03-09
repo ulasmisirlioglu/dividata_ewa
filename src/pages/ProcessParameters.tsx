@@ -4,7 +4,8 @@ import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { ArrowRight, ArrowLeft, Plus, X, Info, AlertCircle } from 'lucide-react';
-import { FigLabel } from '../components/Decorations';
+import { ROUTES } from '../lib/routes';
+
 
 export const ProcessParameters: React.FC = () => {
   const navigate = useNavigate();
@@ -19,18 +20,17 @@ export const ProcessParameters: React.FC = () => {
       return;
     }
     setShowWarning(false);
-    navigate('/results');
+    navigate(ROUTES.RESULTS);
   };
 
   const handleBack = () => {
-    navigate('/ewa-evaluation');
+    navigate(ROUTES.EVALUATION);
   };
 
   return (
     <Layout>
       <div className="max-w-6xl mx-auto animate-fade-in">
         <div className="mb-10">
-          <FigLabel>{t.figure40p}</FigLabel>
           <h1 className="text-4xl font-light mb-4">{t.paramsTitle}</h1>
           <p className="text-hb-gray text-lg font-light max-w-3xl leading-relaxed">
             {t.paramsDesc}
@@ -63,7 +63,7 @@ export const ProcessParameters: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-hb-line">
-              {processIntervals.map((interval) => (
+              {processIntervals.map((interval, idx) => (
                 <tr key={interval.id} className="hover:bg-hb-paper transition-colors">
                   <td className="hb-table-cell px-6 font-medium">
                     {interval.label}
@@ -81,8 +81,18 @@ export const ProcessParameters: React.FC = () => {
                       <span className="text-xs text-hb-gray whitespace-nowrap">bis</span>
                       <input
                         type="month"
+                        min={interval.von || undefined}
                         value={interval.bis}
-                        onChange={(e) => setProcessInterval(interval.id, { bis: e.target.value })}
+                        onChange={(e) => {
+                          const bisVal = e.target.value;
+                          setProcessInterval(interval.id, { bis: bisVal });
+                          if (bisVal && idx < processIntervals.length - 1) {
+                            const [y, m] = bisVal.split('-').map(Number);
+                            const next = new Date(y, m);
+                            const nextVon = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+                            setProcessInterval(processIntervals[idx + 1].id, { von: nextVon });
+                          }
+                        }}
                         onClick={(e) => (e.target as HTMLInputElement).showPicker()}
                         className="bg-transparent border-b border-hb-line hover:border-hb-gray focus:border-hb-ink focus:outline-none py-1 transition-all text-sm cursor-pointer"
                       />
