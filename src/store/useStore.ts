@@ -4,7 +4,7 @@ import type { ProjectRow } from '../lib/database.types';
 
 export type StepActor = 'Mitarbeiter' | 'Bürger';
 
-/** Parse BPMN XML → valid process tasks vs abort-path tasks */
+/** Parse BPMN XML → valid process tasks vs abort-path tasks, sorted by sequence flow order */
 export function parseBpmnXml(xml: string) {
   const allTasks: { id: string; name: string }[] = [];
   const tagRegex = /<bpmn:task\s([^>]*?)>/g;
@@ -57,8 +57,48 @@ export function parseBpmnXml(xml: string) {
     }
   }
 
+  // Topological sort (Kahn's algorithm) — follow sequence flow arrows
+  const allFlowNodes = new Set<string>();
+  for (const f of flows) {
+    allFlowNodes.add(f.source);
+    allFlowNodes.add(f.target);
+  }
+  const inDegree = new Map<string, number>();
+  for (const node of allFlowNodes) inDegree.set(node, 0);
+  for (const f of flows) {
+    inDegree.set(f.target, (inDegree.get(f.target) ?? 0) + 1);
+  }
+
+  const queue: string[] = [];
+  for (const [node, degree] of inDegree) {
+    if (degree === 0) queue.push(node);
+  }
+
+  const taskSet = new Set(allTasks.map((t) => t.id));
+  const flowOrder = new Map<string, number>();
+  let orderIdx = 0;
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (taskSet.has(current)) {
+      flowOrder.set(current, orderIdx++);
+    }
+    for (const target of outgoing.get(current) || []) {
+      const newDeg = (inDegree.get(target) ?? 1) - 1;
+      inDegree.set(target, newDeg);
+      if (newDeg === 0) queue.push(target);
+    }
+  }
+  // Fallback: tasks not reached get appended at end
+  for (const t of allTasks) {
+    if (!flowOrder.has(t.id)) flowOrder.set(t.id, orderIdx++);
+  }
+
+  const sortByFlow = (a: { id: string }, b: { id: string }) =>
+    (flowOrder.get(a.id) ?? 0) - (flowOrder.get(b.id) ?? 0);
+
   return {
-    validTasks: allTasks.filter((t) => !abortNodes.has(t.id)),
+    validTasks: allTasks.filter((t) => !abortNodes.has(t.id)).sort(sortByFlow),
     excludedTasks: allTasks.filter((t) => abortNodes.has(t.id)),
   };
 }
@@ -66,7 +106,6 @@ export function parseBpmnXml(xml: string) {
 export interface StepDuration {
   id: string;
   name: string;
-  suggested: number;
   actual: number;
   actor: StepActor;
 }
@@ -138,14 +177,14 @@ export interface StoreState {
 }
 
 const defaultStepDurations: StepDuration[] = [
-  { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', suggested: 5, actual: 0, actor: 'Bürger' },
-  { id: 'Task_2', name: 'Wartenummer ziehen', suggested: 1, actual: 0, actor: 'Bürger' },
-  { id: 'Task_3', name: 'Warten bis Aufruf', suggested: 15, actual: 0, actor: 'Bürger' },
-  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', suggested: 2, actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', suggested: 5, actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_6', name: 'Bescheinigung drucken', suggested: 2, actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_7', name: 'Gebühren kassieren', suggested: 3, actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', suggested: 1, actual: 0, actor: 'Bürger' },
+  { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', actual: 0, actor: 'Bürger' },
+  { id: 'Task_2', name: 'Wartenummer ziehen', actual: 0, actor: 'Bürger' },
+  { id: 'Task_3', name: 'Warten bis Aufruf', actual: 0, actor: 'Bürger' },
+  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', actual: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', actual: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_6', name: 'Bescheinigung drucken', actual: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_7', name: 'Gebühren kassieren', actual: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', actual: 0, actor: 'Bürger' },
 ];
 
 const defaultDigitalSteps: DigitalStep[] = [
@@ -213,6 +252,8 @@ export const useStore = create<StoreState>((set) => ({
 
     const validIds = new Set(validTasks.map((t) => t.id));
     const nameMap = new Map(validTasks.map((t) => [t.id, t.name]));
+    // Build order index from BPMN XML task order
+    const orderIndex = new Map(validTasks.map((t, i) => [t.id, i]));
 
     // Sync stepDurations: update existing, add new, remove deleted/abort
     const existingStepIds = new Set(state.stepDurations.map((s) => s.id));
@@ -224,9 +265,11 @@ export const useStore = create<StoreState>((set) => ({
       });
     for (const task of validTasks) {
       if (!existingStepIds.has(task.id)) {
-        updatedSteps.push({ id: task.id, name: task.name, suggested: 0, actual: 0, actor: 'Mitarbeiter' as StepActor });
+        updatedSteps.push({ id: task.id, name: task.name, actual: 0, actor: 'Mitarbeiter' as StepActor });
       }
     }
+    // Sort to match BPMN XML order
+    updatedSteps.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
 
     // Sync digitalSteps: update existing, add new, remove deleted/abort
     const existingDigitalIds = new Set(state.digitalSteps.map((s) => s.id));
@@ -241,6 +284,8 @@ export const useStore = create<StoreState>((set) => ({
         updatedDigital.push({ id: task.id, name: task.name, digitalReplacement: '', digitalizationPercent: 0, digitalDuration: 0 });
       }
     }
+    // Sort to match BPMN XML order
+    updatedDigital.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
 
     return {
       bpmnXml: xml,
@@ -267,20 +312,30 @@ export const useStore = create<StoreState>((set) => ({
     processIntervals: state.processIntervals.map((i) => i.id === id ? { ...i, ...updates } : i)
   })),
   addProcessInterval: () => set((state) => {
-    const nextNum = state.processIntervals.length;
+    const existing = state.processIntervals;
+    const nextLabel = existing.length + 1;
+    const lastInterval = existing[existing.length - 1];
+    let autoVon = '';
+    if (lastInterval?.bis) {
+      const [y, m] = lastInterval.bis.split('-').map(Number);
+      const next = new Date(y, m); // month is 0-indexed, so m means next month
+      autoVon = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+    }
     return {
-      processIntervals: [...state.processIntervals, {
-        id: `interval_${nextNum}`,
-        label: `Intervall ${nextNum}`,
-        von: '',
+      processIntervals: [...existing, {
+        id: `interval_${Date.now()}`,
+        label: `Intervall ${nextLabel}`,
+        von: autoVon,
         bis: '',
-        volumen: 500,
+        volumen: 0,
         digitalisierungsquote: 0,
       }]
     };
   }),
   removeProcessInterval: (id) => set((state) => ({
-    processIntervals: state.processIntervals.filter((i) => i.id !== id)
+    processIntervals: state.processIntervals
+      .filter((i) => i.id !== id)
+      .map((i, idx) => ({ ...i, label: `Intervall ${idx + 1}` }))
   })),
 
   loadProject: (data) => {

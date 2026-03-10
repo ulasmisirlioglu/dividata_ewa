@@ -5,6 +5,7 @@ import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { ArrowRight, ArrowLeft, Plus, X, Info, AlertCircle } from 'lucide-react';
 import { ROUTES } from '../lib/routes';
+import { MonthPicker } from '../components/MonthPicker';
 
 
 export const ProcessParameters: React.FC = () => {
@@ -51,7 +52,7 @@ export const ProcessParameters: React.FC = () => {
           </div>
         </div>
 
-        <div className="hb-card p-0 overflow-hidden mb-8 shadow-xl shadow-black/5">
+        <div className="hb-card p-0 overflow-visible mb-8 shadow-xl shadow-black/5">
           <table className="min-w-full">
             <thead>
               <tr>
@@ -71,20 +72,15 @@ export const ProcessParameters: React.FC = () => {
                   <td className="hb-table-cell px-6">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-hb-gray whitespace-nowrap">von</span>
-                      <input
-                        type="month"
+                      <MonthPicker
                         value={interval.von}
-                        onChange={(e) => setProcessInterval(interval.id, { von: e.target.value })}
-                        onClick={(e) => (e.target as HTMLInputElement).showPicker()}
-                        className="bg-transparent border-b border-hb-line hover:border-hb-gray focus:border-hb-ink focus:outline-none py-1 transition-all text-sm cursor-pointer"
+                        onChange={(val) => setProcessInterval(interval.id, { von: val })}
                       />
                       <span className="text-xs text-hb-gray whitespace-nowrap">bis</span>
-                      <input
-                        type="month"
-                        min={interval.von || undefined}
+                      <MonthPicker
                         value={interval.bis}
-                        onChange={(e) => {
-                          const bisVal = e.target.value;
+                        min={interval.von || undefined}
+                        onChange={(bisVal) => {
                           setProcessInterval(interval.id, { bis: bisVal });
                           if (bisVal && idx < processIntervals.length - 1) {
                             const [y, m] = bisVal.split('-').map(Number);
@@ -93,8 +89,6 @@ export const ProcessParameters: React.FC = () => {
                             setProcessInterval(processIntervals[idx + 1].id, { von: nextVon });
                           }
                         }}
-                        onClick={(e) => (e.target as HTMLInputElement).showPicker()}
-                        className="bg-transparent border-b border-hb-line hover:border-hb-gray focus:border-hb-ink focus:outline-none py-1 transition-all text-sm cursor-pointer"
                       />
                     </div>
                   </td>

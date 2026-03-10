@@ -4,7 +4,7 @@ import BpmnModeler from 'bpmn-js/lib/Modeler';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
 import jsPDF from 'jspdf';
-import { Download } from 'lucide-react';
+import { Download, Star } from 'lucide-react';
 import { useLangStore } from '../store/useLangStore';
 
 // Custom palette provider — only essential tools
@@ -72,9 +72,11 @@ const CustomPaletteModule = {
 interface BPMNEditorProps {
   xml: string;
   onSave: (xml: string) => void;
+  onSetAsDefault?: () => void;
+  setAsDefaultLabel?: string;
 }
 
-export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave }) => {
+export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefault, setAsDefaultLabel }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
   const { language } = useLangStore();
@@ -209,8 +211,17 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave }) => {
   return (
     <div className="flex flex-col h-[600px] bg-white border border-hb-line relative">
       <div className="flex-grow bg-white" ref={containerRef} />
-      {/* Download PDF — top right */}
-      <div className="absolute top-6 right-6 z-10">
+      {/* Actions — top right */}
+      <div className="absolute top-6 right-6 z-10 flex gap-2">
+        {onSetAsDefault && (
+          <button
+            onClick={onSetAsDefault}
+            className="flex items-center gap-2 bg-white border border-hb-line text-hb-ink hover:border-hb-ink px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors shadow-sm"
+          >
+            <Star size={14} />
+            {setAsDefaultLabel ?? 'Default'}
+          </button>
+        )}
         <button
           onClick={handleDownloadPdf}
           className="flex items-center gap-2 bg-white border border-hb-line text-hb-ink hover:border-hb-ink px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors shadow-sm"

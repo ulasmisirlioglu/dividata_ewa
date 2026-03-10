@@ -42,7 +42,6 @@ interface Translation {
   stepDurationsDesc: string;
   stepNameHeader: string;
   actorHeader: string;
-  suggestedHeader: string;
   estimateHeader: string;
   totalDuration: string;
   parametersTitle: string;
@@ -97,6 +96,9 @@ interface Translation {
   oneTimeLabel: string;
   totalAnnualCosts: string;
   totalOneTimeCosts: string;
+  annualCostsLabel: string;
+  oneTimeCostsLabel: string;
+  sumLabel: string;
   digitalPersonnelCost: string;
   digitalPersonnelCostInfo: string;
   perProcessLabel: string;
@@ -242,6 +244,13 @@ interface Translation {
   dashboardCreating: string;
   dashboardDeleteConfirm: string;
 
+  // Copy project
+  dashboardCopySuccess: string;
+
+  // BPMN default
+  setAsDefault: string;
+  setAsDefaultSuccess: string;
+
   // Save status
   saveStatusSaving: string;
   saveStatusSaved: string;
@@ -285,7 +294,6 @@ const translations: Record<Language, Translation> = {
     stepDurationsDesc: 'Schätzen Sie die Zeit (in Minuten), die jeder Schritt im aktuellen analogen Prozess in Anspruch nimmt.',
     stepNameHeader: 'Schrittname',
     actorHeader: 'Mitarbeiter / Bürger',
-    suggestedHeader: 'Vorschlag (min)',
     estimateHeader: 'Ihre Schätzung (min)',
     totalDuration: 'Gesamtdauer',
     parametersTitle: 'Kosten des analogen Prozesses',
@@ -336,8 +344,11 @@ const translations: Record<Language, Translation> = {
     otherCostYear: 'Sonstige Kosten',
     annualLabel: 'jährlich',
     oneTimeLabel: 'einmalig',
-    totalAnnualCosts: 'Jährliche Gesamtkosten',
-    totalOneTimeCosts: 'Einmalige Gesamtkosten',
+    totalAnnualCosts: 'Jährliche Kosten',
+    totalOneTimeCosts: 'Einmalige Kosten',
+    annualCostsLabel: 'Jährliche Kosten',
+    oneTimeCostsLabel: 'Einmalige Kosten',
+    sumLabel: 'Summe',
     digitalPersonnelCost: 'Digitale Personalkosten',
     digitalPersonnelCostInfo: 'Dieser Wert wird automatisch aus der digitalen Prozessbewertung berechnet: Mitarbeiter-Minuten des digitalen Prozesses × Stundenlohn der gewählten Tarifgruppe. Um diesen Wert zu ändern, passen Sie die vorherigen Schritte an.',
     perProcessLabel: 'pro Prozess',
@@ -472,8 +483,13 @@ const translations: Record<Language, Translation> = {
     dashboardCreating: 'Erstellen...',
     dashboardDeleteConfirm: 'Projekt wirklich löschen?',
 
+    dashboardCopySuccess: 'Kopie erstellt',
+
+    setAsDefault: 'Als Standard',
+    setAsDefaultSuccess: 'Gespeichert!',
+
     saveStatusSaving: 'Speichern...',
-    saveStatusSaved: 'Gespeichert',
+    saveStatusSaved: 'Automatisch gespeichert',
     saveStatusError: 'Speicherfehler',
   },
   en: {
@@ -512,7 +528,6 @@ const translations: Record<Language, Translation> = {
     stepDurationsDesc: 'Estimate the time (in minutes) each step takes in the current analog process.',
     stepNameHeader: 'Step Name',
     actorHeader: 'Employee / Citizen',
-    suggestedHeader: 'Suggested (min)',
     estimateHeader: 'Your Estimate (min)',
     totalDuration: 'Total Duration',
     parametersTitle: 'Analog Process Costs',
@@ -563,8 +578,11 @@ const translations: Record<Language, Translation> = {
     otherCostYear: 'Other Costs',
     annualLabel: 'annual',
     oneTimeLabel: 'one-time',
-    totalAnnualCosts: 'Total Annual Costs',
-    totalOneTimeCosts: 'Total One-Time Costs',
+    totalAnnualCosts: 'Annual Costs',
+    totalOneTimeCosts: 'One-Time Costs',
+    annualCostsLabel: 'Annual Costs',
+    oneTimeCostsLabel: 'One-Time Costs',
+    sumLabel: 'Total',
     digitalPersonnelCost: 'Digital Personnel Cost',
     digitalPersonnelCostInfo: 'This value is automatically calculated from the digital process evaluation: employee minutes of the digital process × hourly rate of the selected tariff group. To change this value, adjust the previous steps.',
     perProcessLabel: 'per process',
@@ -699,8 +717,13 @@ const translations: Record<Language, Translation> = {
     dashboardCreating: 'Creating...',
     dashboardDeleteConfirm: 'Really delete this project?',
 
+    dashboardCopySuccess: 'Copy created',
+
+    setAsDefault: 'Set as Default',
+    setAsDefaultSuccess: 'Saved!',
+
     saveStatusSaving: 'Saving...',
-    saveStatusSaved: 'Saved',
+    saveStatusSaved: 'Auto-saved',
     saveStatusError: 'Save Error',
   }
 };

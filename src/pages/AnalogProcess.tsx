@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore, parseBpmnXml } from '../store/useStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { BPMNEditor } from '../components/BPMNEditor';
 import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
 import { ROUTES } from '../lib/routes';
+import { setDefaultBpmn } from '../lib/projectService';
 import clsx from 'clsx';
 
 
@@ -17,9 +19,23 @@ export const AnalogProcess: React.FC = () => {
     salaryGroup, setSalaryGroup,
     hourlyRate, setHourlyRate,
   } = useStore();
+  const { userId } = useAuthStore();
   const { t } = useLangStore();
+  const useCase = useStore((s) => s.useCase);
 
   const [currentStep, setCurrentStep] = useState(1);
+  const [defaultSaved, setDefaultSaved] = useState(false);
+
+  const handleSetAsDefault = useCallback(async () => {
+    if (!userId) return;
+    try {
+      await setDefaultBpmn(userId, useCase, bpmnXml);
+      setDefaultSaved(true);
+      setTimeout(() => setDefaultSaved(false), 2000);
+    } catch (err) {
+      console.error('Failed to set default BPMN', err);
+    }
+  }, [userId, useCase, bpmnXml]);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -74,7 +90,12 @@ export const AnalogProcess: React.FC = () => {
               </div>
               <div className="rounded-none overflow-hidden border border-hb-line shadow-2xl shadow-black/5">
                  {/* Wrapper for the white editor to make it look like a page */}
-                <BPMNEditor xml={bpmnXml} onSave={setBpmnXml} />
+                <BPMNEditor
+                  xml={bpmnXml}
+                  onSave={setBpmnXml}
+                  onSetAsDefault={handleSetAsDefault}
+                  setAsDefaultLabel={defaultSaved ? t.setAsDefaultSuccess : t.setAsDefault}
+                />
               </div>
             </div>
           )}

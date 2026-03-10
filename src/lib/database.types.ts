@@ -34,9 +34,33 @@ export interface ProjectRow {
   updated_at: string;
 }
 
+export interface DefaultBpmnRow {
+  id: string;
+  user_id: string;
+  use_case: string;
+  bpmn_xml: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
+      default_bpmns: {
+        Row: DefaultBpmnRow;
+        Insert: {
+          id?: string;
+          user_id: string;
+          use_case: string;
+          bpmn_xml: string;
+        };
+        Update: {
+          user_id?: string;
+          use_case?: string;
+          bpmn_xml?: string;
+        };
+        Relationships: [];
+      };
       projects: {
         Row: ProjectRow;
         Insert: {

@@ -97,6 +97,49 @@ export async function saveProject(
   if (error) throw error;
 }
 
+export async function setDefaultBpmn(userId: string, useCase: string, bpmnXml: string) {
+  const { error } = await supabase
+    .from('default_bpmns')
+    .upsert(
+      { user_id: userId, use_case: useCase, bpmn_xml: bpmnXml },
+      { onConflict: 'user_id,use_case' },
+    );
+
+  if (error) throw error;
+}
+
+export async function getDefaultBpmn(userId: string, useCase: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('default_bpmns')
+    .select('bpmn_xml')
+    .eq('user_id', userId)
+    .eq('use_case', useCase)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null; // no rows
+    throw error;
+  }
+  return data?.bpmn_xml ?? null;
+}
+
+export async function copyProject(projectId: string, newName: string): Promise<ProjectRow> {
+  // Load the original project
+  const original = await loadProject(projectId);
+  if (!original) throw new Error('Project not found');
+
+  // Strip id and timestamps, insert as new row
+  const { id: _id, created_at: _ca, updated_at: _ua, ...rest } = original;
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({ ...rest, project_name: newName })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as ProjectRow;
+}
+
 export async function deleteProject(projectId: string) {
   const { error } = await supabase
     .from('projects')

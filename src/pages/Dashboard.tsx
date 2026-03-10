@@ -4,8 +4,8 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
-import { ArrowRight, LogOut, Plus, Folder, Trash2, X } from 'lucide-react';
-import { listProjects, createProject, loadProject, deleteProject } from '../lib/projectService';
+import { ArrowRight, LogOut, Plus, Folder, Trash2, Copy, X } from 'lucide-react';
+import { listProjects, createProject, loadProject, deleteProject, copyProject, getDefaultBpmn } from '../lib/projectService';
 import type { ProjectSummary } from '../lib/projectService';
 import { ROUTES } from '../lib/routes';
 
@@ -50,6 +50,17 @@ export const Dashboard: React.FC = () => {
       store.setUseCase('Elektronische Wohnsitzanmeldung (eWA)');
       store.setCurrentProjectId(row.id);
       store.setProjectName(row.project_name);
+
+      // Load user's custom default BPMN for this use case (if any)
+      try {
+        const customBpmn = await getDefaultBpmn(userId, 'Elektronische Wohnsitzanmeldung (eWA)');
+        if (customBpmn) {
+          store.setBpmnXml(customBpmn);
+        }
+      } catch {
+        // Ignore — fall back to initialBpmn.ts default
+      }
+
       navigate(ROUTES.ANALOG_PROCESS);
     } catch (err) {
       console.error('Failed to create project', err);
@@ -77,6 +88,25 @@ export const Dashboard: React.FC = () => {
       setProjects(prev => prev.filter(p => p.id !== projectId));
     } catch (err) {
       console.error('Failed to delete project', err);
+    }
+  };
+
+  const handleCopyProject = async (e: React.MouseEvent, project: ProjectSummary) => {
+    e.stopPropagation();
+    try {
+      const newName = `${project.project_name} (Kopie)`;
+      const copy = await copyProject(project.id, newName);
+      setProjects(prev => [{
+        id: copy.id,
+        project_name: copy.project_name,
+        use_case: copy.use_case,
+        created_at: copy.created_at,
+        updated_at: copy.updated_at,
+        roi: copy.roi,
+        cost_saving_per_case: copy.cost_saving_per_case,
+      }, ...prev]);
+    } catch (err) {
+      console.error('Failed to copy project', err);
     }
   };
 
@@ -180,6 +210,13 @@ export const Dashboard: React.FC = () => {
                     <span className="text-xs text-hb-gray font-mono">
                       {new Date(project.updated_at).toLocaleDateString(locale)}
                     </span>
+                    <button
+                      onClick={(e) => handleCopyProject(e, project)}
+                      className="text-hb-gray/40 hover:text-hb-ink transition-colors p-1"
+                      title={t.dashboardCopySuccess}
+                    >
+                      <Copy size={16} />
+                    </button>
                     <button
                       onClick={(e) => handleDeleteProject(e, project.id)}
                       className="text-hb-gray/40 hover:text-red-500 transition-colors p-1"

@@ -32,12 +32,15 @@ export const DigitalizationCosts: React.FC = () => {
   const totalAnnual = digitalizationCosts.licenseCostYear + digitalizationCosts.maintenanceCostYear + digitalizationCosts.otherCostYear + digitalPersonnelCostPerProcess;
   const totalOneTime = digitalizationCosts.implementationCost + digitalizationCosts.trainingCost;
 
-  const costFields = [
-    { key: 'licenseCostYear' as const, label: t.licenseCostYear, type: t.annualLabel },
-    { key: 'maintenanceCostYear' as const, label: t.maintenanceCostYear, type: t.annualLabel },
-    { key: 'otherCostYear' as const, label: t.otherCostYear, type: t.annualLabel },
-    { key: 'implementationCost' as const, label: t.implementationCost, type: t.oneTimeLabel },
-    { key: 'trainingCost' as const, label: t.trainingCost, type: t.oneTimeLabel },
+  const annualFields = [
+    { key: 'licenseCostYear' as const, label: t.licenseCostYear },
+    { key: 'maintenanceCostYear' as const, label: t.maintenanceCostYear },
+    { key: 'otherCostYear' as const, label: t.otherCostYear },
+  ];
+
+  const oneTimeFields = [
+    { key: 'implementationCost' as const, label: t.implementationCost },
+    { key: 'trainingCost' as const, label: t.trainingCost },
   ];
 
   return (
@@ -78,39 +81,58 @@ export const DigitalizationCosts: React.FC = () => {
           </p>
         </div>
 
+        {/* Jährliche Kosten */}
         <div className="hb-card p-0 overflow-hidden mb-8 shadow-xl shadow-black/5">
           <table className="min-w-full">
             <thead>
               <tr>
-                <th className="hb-table-header px-6 pt-6 text-left">{t.costPositionHeader}</th>
-                <th className="hb-table-header px-6 pt-6 text-right">{t.costTypeHeader}</th>
+                <th className="hb-table-header px-6 pt-6 text-left">{t.annualCostsLabel}</th>
                 <th className="hb-table-header px-6 pt-6 text-right">{t.costAmountHeader}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hb-line">
-              {/* Digital personnel cost - read-only, pre-calculated */}
-              <tr className="hover:bg-hb-paper transition-colors">
-                <td className="hb-table-cell px-6 font-medium">{t.digitalPersonnelCost}</td>
-                <td className="hb-table-cell px-6 text-right">
-                  <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">
-                    {t.perProcessLabel}
-                  </span>
-                </td>
-                <td className="hb-table-cell px-6 text-right">
-                  <div className="flex items-center justify-end">
-                    <span className="py-1 mr-2">{digitalPersonnelCostPerProcess.toFixed(2)}</span>
-                    <span className="text-hb-gray text-xs">€</span>
-                  </div>
-                </td>
-              </tr>
-              {costFields.map((field) => (
+              {annualFields.map((field) => (
                 <tr key={field.key} className="hover:bg-hb-paper transition-colors">
                   <td className="hb-table-cell px-6 font-medium">{field.label}</td>
                   <td className="hb-table-cell px-6 text-right">
-                    <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">
-                      {field.type}
-                    </span>
+                    <div className="flex items-center justify-end">
+                      <input
+                        type="number"
+                        min="0"
+                        value={digitalizationCosts[field.key]}
+                        onChange={(e) => setDigitalizationCosts({ [field.key]: parseFloat(e.target.value) || 0 })}
+                        className="w-28 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 mr-2 transition-colors"
+                      />
+                      <span className="text-hb-gray text-xs">€ / Jahr</span>
+                    </div>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-hb-paper">
+                <td className="hb-table-cell px-6 font-medium">{t.sumLabel}</td>
+                <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
+                  {totalAnnual.toLocaleString(locale)} € / Jahr
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Einmalige Kosten */}
+        <div className="hb-card p-0 overflow-hidden mb-8 shadow-xl shadow-black/5">
+          <table className="min-w-full">
+            <thead>
+              <tr>
+                <th className="hb-table-header px-6 pt-6 text-left">{t.oneTimeCostsLabel}</th>
+                <th className="hb-table-header px-6 pt-6 text-right">{t.costAmountHeader}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-hb-line">
+              {oneTimeFields.map((field) => (
+                <tr key={field.key} className="hover:bg-hb-paper transition-colors">
+                  <td className="hb-table-cell px-6 font-medium">{field.label}</td>
                   <td className="hb-table-cell px-6 text-right">
                     <div className="flex items-center justify-end">
                       <input
@@ -128,21 +150,9 @@ export const DigitalizationCosts: React.FC = () => {
             </tbody>
             <tfoot>
               <tr className="bg-hb-paper">
-                <td className="hb-table-cell px-6 font-medium">{t.totalAnnualCosts}</td>
-                <td className="hb-table-cell px-6 text-right">
-                  <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.annualLabel}</span>
-                </td>
+                <td className="hb-table-cell px-6 font-medium">{t.sumLabel}</td>
                 <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
-                  {totalAnnual.toLocaleString(locale)} €
-                </td>
-              </tr>
-              <tr className="bg-hb-paper border-t border-hb-line">
-                <td className="hb-table-cell px-6 font-medium">{t.totalOneTimeCosts}</td>
-                <td className="hb-table-cell px-6 text-right">
-                  <span className="text-xs font-mono text-hb-gray uppercase tracking-wider">{t.oneTimeLabel}</span>
-                </td>
-                <td className="hb-table-cell px-6 text-right text-hb-ink text-lg font-medium">
-                  {totalOneTime.toLocaleString(locale)} €
+                  {totalOneTime.toLocaleString(locale)} € (einmalig)
                 </td>
               </tr>
             </tfoot>

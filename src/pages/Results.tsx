@@ -144,17 +144,9 @@ export const Results: React.FC = () => {
     const prev = timeSeries[crossIdx - 1];
     const curr = timeSeries[crossIdx];
     const fraction = Math.abs(prev.cumEur) / (Math.abs(prev.cumEur) + Math.abs(curr.cumEur));
-    const [pY, pM] = prev.month.split('-').map(Number);
-    const [cY, cM] = curr.month.split('-').map(Number);
-    const prevDate = new Date(pY, pM - 1, 1);
-    const currDate = new Date(cY, cM - 1, 1);
-    const beDate = new Date(prevDate.getTime() + fraction * (currDate.getTime() - prevDate.getTime()));
-    const monthNames = language === 'de'
-      ? ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sept.', 'Okt.', 'Nov.', 'Dez.']
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return {
       x: crossIdx - 1 + fraction,
-      label: `Break-Even: ${beDate.getDate()}. ${monthNames[beDate.getMonth()]} ${beDate.getFullYear()}`,
+      label: 'Break-Even',
     };
   }, [timeSeries, language]);
 
@@ -168,7 +160,7 @@ export const Results: React.FC = () => {
     // Calculate months between start and break-even
     const [sy, sm] = startMonth.split('-').map(Number);
     const [by, bm] = beMonth.split('-').map(Number);
-    const monthsCount = (by - sy) * 12 + (bm - sm) + 1;
+    const monthsCount = (by - sy) * 12 + (bm - sm);
     return { month: beMonth, monthsCount };
   }, [timeSeries]);
 
@@ -183,6 +175,33 @@ export const Results: React.FC = () => {
     if (totalInvestment === 0) return null;
     return Math.round((last.cumEur / totalInvestment) * 10000) / 100;
   }, [timeSeries, digitalizationCosts]);
+
+  // Interval ranges for labeling charts
+  const intervalRanges = useMemo(() => {
+    const valid = processIntervals
+      .filter(i => i.von && i.bis && i.volumen > 0)
+      .sort((a, b) => a.von.localeCompare(b.von));
+    if (valid.length < 2 || timeSeries.length === 0) return [];
+    return valid.map(interval => {
+      let count = 0;
+      for (const p of timeSeries) {
+        if (p.month >= interval.von && p.month <= interval.bis) count++;
+      }
+      return { label: interval.label, months: count };
+    }).filter(r => r.months > 0);
+  }, [processIntervals, timeSeries]);
+
+  const intervalLabels = intervalRanges.length >= 2 ? (
+    <div className="flex" style={{ paddingLeft: 70, paddingRight: 30, marginTop: 2 }}>
+      {intervalRanges.map((r, i) => (
+        <div key={i} style={{ flex: r.months }} className="text-center">
+          <div className="border-t border-hb-gray/30 mx-1 pt-1">
+            <span className="text-[10px] text-hb-gray/70 font-light">{r.label}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : null;
 
   // Helper to get actor for a digital step
   const getActor = (id: string) => stepDurations.find(s => s.id === id)?.actor ?? '';
@@ -226,26 +245,26 @@ export const Results: React.FC = () => {
       doc.text(t.pdfConfidential, 105, 290, { align: 'center' });
     };
 
-    const heading = (text: string) => {
+    const heading = (num: string, text: string) => {
       check(16);
       doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...INK);
-      doc.text(text, M, y);
+      doc.text(`${num}  ${text}`, M, y);
       y += 2;
       doc.setDrawColor(...LINE);
       doc.setLineWidth(0.4);
       doc.line(M, y, M + W, y);
-      y += 7;
+      y += 9;
     };
 
-    const label = (text: string) => {
-      check(8);
-      doc.setFontSize(8);
+    const label = (num: string, text: string) => {
+      check(10);
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...GRAY);
-      doc.text(text.toUpperCase(), M, y);
-      y += 5;
+      doc.setTextColor(...INK);
+      doc.text(`${num}  ${text.toUpperCase()}`, M, y);
+      y += 7;
     };
 
     const kv = (key: string, val: string) => {
@@ -293,9 +312,44 @@ export const Results: React.FC = () => {
     if (stadtname) doc.text(stadtname, M + W, 30, { align: 'right' });
 
     // ─── INPUTS ───
-    heading(t.pdfInputParams);
+    heading('1.', t.pdfInputParams);
 
-    label(t.resultsAnalogSteps);
+    // BPMN diagram
+    if (bpmnXml) {
+      const tempBpmn = document.createElement('div');
+      tempBpmn.style.cssText = 'width:900px;height:400px;position:absolute;left:-9999px;background:#fff';
+      document.body.appendChild(tempBpmn);
+      const tempViewer = new NavigatedViewer({ container: tempBpmn });
+      try {
+        await tempViewer.importXML(bpmnXml);
+        const bpmnCanvas = tempViewer.get('canvas');
+        bpmnCanvas.zoom('fit-viewport');
+        bpmnCanvas.zoom(bpmnCanvas.zoom() * 0.85);
+        // Hide bpmn.io watermark
+        const badge = tempBpmn.querySelector('.bjs-powered-by');
+        if (badge) (badge as HTMLElement).style.display = 'none';
+        const captured = await html2canvas(tempBpmn, { backgroundColor: '#FFFFFF', scale: 2 });
+        const bpmnRatio = captured.height / captured.width;
+        let bpmnH = W * bpmnRatio;
+        if (bpmnH > 80) bpmnH = 80;
+        check(bpmnH + 10);
+        label('1.1', t.resultsBpmnProcess);
+        doc.addImage(captured.toDataURL('image/png'), 'PNG', M, y, W, bpmnH);
+        y += bpmnH + 5;
+        doc.setDrawColor(...LINE);
+        doc.setLineWidth(0.15);
+        doc.line(M, y, M + W, y);
+        y += 6;
+      } catch (e) { /* BPMN capture failed, skip */ }
+      tempViewer.destroy();
+      document.body.removeChild(tempBpmn);
+    }
+
+    // Pre-calculate analog steps table height to avoid page split
+    const analogTableH = 5 + 5 + stepDurations.length * 4.5 + 21; // label + header + rows + sums
+    check(analogTableH);
+
+    label('1.2', t.resultsAnalogSteps);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...INK);
@@ -309,7 +363,6 @@ export const Results: React.FC = () => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     for (const step of stepDurations) {
-      check(5);
       doc.setTextColor(...INK);
       doc.text(doc.splitTextToSize(step.name, 90)[0], M, y);
       doc.setTextColor(...GRAY);
@@ -318,45 +371,136 @@ export const Results: React.FC = () => {
       doc.text(step.actual.toString(), M + W, y, { align: 'right' });
       y += 4.5;
     }
+    // Analog sums
+    const analogMitarbeiterMin = stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((a, s) => a + s.actual, 0);
+    const analogBuergerMin = stepDurations.filter(s => s.actor === 'Bürger').reduce((a, s) => a + s.actual, 0);
+    y += 1;
+    doc.setDrawColor(...LINE);
+    doc.line(M + W - 30, y, M + W, y);
     y += 4;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text(language === 'de' ? 'Mitarbeiter' : 'Employee', M + 95, y);
+    doc.setTextColor(...INK);
+    doc.text(analogMitarbeiterMin.toString(), M + W, y, { align: 'right' });
+    y += 4;
+    doc.setTextColor(...GRAY);
+    doc.text(language === 'de' ? 'Bürger' : 'Citizen', M + 95, y);
+    doc.setTextColor(...INK);
+    doc.text(analogBuergerMin.toString(), M + W, y, { align: 'right' });
+    y += 6;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.15);
+    doc.line(M, y, M + W, y);
+    y += 6;
 
-    label(`TVöD EG ${salaryGroup}  |  ${hourlyRate} ${t.eurPerHour}`);
-    y += 3;
+    // ─── Personalkosten ───
+    // Pre-calculate salary section height: label(8) + 3 kv(15) + spacing(4) = 27
+    check(27);
+    label('1.3', t.resultsSalary);
+    kv('TVöD EG', salaryGroup);
+    kv(language === 'de' ? 'Stundenlohn' : 'Hourly Rate', `${hourlyRate} ${t.eurPerHour}`);
+    const analogCostPerProcess = (analogMitarbeiterMin / 60) * hourlyRate;
+    kv(t.costPerProcess, eur(analogCostPerProcess));
+    y += 4;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.15);
+    doc.line(M, y, M + W, y);
+    y += 6;
 
-    label(t.resultsDigitalSteps);
+    // Pre-calculate digital steps table height to avoid page split
+    const digitalTableH = 9 + 5 + digitalSteps.length * 4.5 + 21; // heading + header + rows + sums
+    check(digitalTableH);
+
+    label('1.4', t.resultsDigitalSteps);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...INK);
-    doc.text(t.pdfStep, M, y);
+    doc.text(t.analogStepHeader, M, y);
+    doc.text(t.digitalReplacementHeader, M + 80, y);
     doc.text(t.pdfDigMin, M + W, y, { align: 'right' });
     y += 1;
+    doc.setDrawColor(...LINE);
     doc.line(M, y, M + W, y);
     y += 4;
     doc.setFont('helvetica', 'normal');
     for (const ds of digitalSteps) {
-      check(5);
       doc.setTextColor(...INK);
-      doc.text(doc.splitTextToSize(ds.name, 100)[0], M, y);
+      doc.text(doc.splitTextToSize(ds.name, 75)[0], M, y);
+      doc.setTextColor(...GRAY);
+      doc.text(doc.splitTextToSize(ds.digitalReplacement || '—', 75)[0], M + 80, y);
       doc.setTextColor(...INK);
       doc.text(ds.digitalDuration.toString(), M + W, y, { align: 'right' });
       y += 4.5;
     }
+    // Digital sums
+    const digitalMitarbeiterMin = digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Mitarbeiter').reduce((a, d) => a + d.digitalDuration, 0);
+    const digitalBuergerMin = digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Bürger').reduce((a, d) => a + d.digitalDuration, 0);
+    y += 1;
+    doc.setDrawColor(...LINE);
+    doc.line(M + W - 30, y, M + W, y);
     y += 4;
-
-    check(30);
-    label(t.pdfDigCosts);
-    kv(t.implementationCost, eur(digitalizationCosts.implementationCost));
-    kv(t.trainingCost, eur(digitalizationCosts.trainingCost));
-    kv(t.licenseCostYear, eur(digitalizationCosts.licenseCostYear));
-    kv(t.maintenanceCostYear, eur(digitalizationCosts.maintenanceCostYear));
-    kv(t.otherCostYear, eur(digitalizationCosts.otherCostYear));
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text(language === 'de' ? 'Mitarbeiter' : 'Employee', M + 95, y);
+    doc.setTextColor(...INK);
+    doc.text(digitalMitarbeiterMin.toString(), M + W, y, { align: 'right' });
     y += 4;
+    doc.setTextColor(...GRAY);
+    doc.text(language === 'de' ? 'Bürger' : 'Citizen', M + 95, y);
+    doc.setTextColor(...INK);
+    doc.text(digitalBuergerMin.toString(), M + W, y, { align: 'right' });
+    y += 6;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.15);
+    doc.line(M, y, M + W, y);
+    y += 6;
 
-    check(20);
-    label(t.pdfProcessIntervals);
+    // Pre-calculate Digitalisierungskosten height: label(5) + 3 yearly kv(15) + yearly sum(11) + 2 onetime kv(10) + onetime sum(11) = 52
+    check(52);
+    label('1.5', t.pdfDigCosts);
+    kv(t.licenseCostYear, eur(digitalizationCosts.licenseCostYear) + (language === 'de' ? ' / Jahr' : ' / year'));
+    kv(t.maintenanceCostYear, eur(digitalizationCosts.maintenanceCostYear) + (language === 'de' ? ' / Jahr' : ' / year'));
+    kv(t.otherCostYear, eur(digitalizationCosts.otherCostYear) + (language === 'de' ? ' / Jahr' : ' / year'));
+    // Yearly sum
+    y += 1;
+    doc.setDrawColor(...LINE);
+    doc.line(M + W - 60, y, M + W, y);
+    y += 4;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text(language === 'de' ? 'Jährlich gesamt' : 'Annual Total', M, y);
+    doc.text(eur(totalAnnual) + (language === 'de' ? ' / Jahr' : ' / year'), M + W, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += 8;
+    kv(t.implementationCost, eur(digitalizationCosts.implementationCost) + (language === 'de' ? ' (einmalig)' : ' (one-time)'));
+    kv(t.trainingCost, eur(digitalizationCosts.trainingCost) + (language === 'de' ? ' (einmalig)' : ' (one-time)'));
+    // One-time sum
+    y += 1;
+    doc.setDrawColor(...LINE);
+    doc.line(M + W - 60, y, M + W, y);
+    y += 4;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...INK);
+    doc.text(language === 'de' ? 'Einmalig gesamt' : 'One-Time Total', M, y);
+    doc.text(eur(totalOneTime) + (language === 'de' ? ' (einmalig)' : ' (one-time)'), M + W, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    y += 5;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.15);
+    doc.line(M, y, M + W, y);
+    y += 10;
+
+    // Pre-calculate process intervals height: label(5) + rows
     const validIntervals = processIntervals.filter(i => i.von && i.bis && i.volumen > 0);
+    const intervalsTableH = 5 + validIntervals.length * 5;
+    check(intervalsTableH);
+    label('1.6', t.pdfProcessIntervals);
     for (const iv of validIntervals) {
-      check(6);
       doc.setFontSize(8.5);
       doc.setTextColor(...INK);
       doc.text(`${formatMonthLabel(iv.von, language)} – ${formatMonthLabel(iv.bis, language)}`, M, y);
@@ -374,26 +518,22 @@ export const Results: React.FC = () => {
 
     // Section title with top spacing
     y += 8;
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...INK);
-    doc.text(t.navResults, M, y);
-    y += 10;
+    heading('2.', t.navResults);
 
-    heading(t.timeSavingsPerCase);
+    label('2.1', t.timeSavingsPerCase);
     kv(t.mitarbeiterMinSaved, perCase.mitarbeiterMinutesSaved.toFixed(1) + ' min');
     kv(t.buergerMinSaved, perCase.buergerMinutesSaved.toFixed(1) + ' min');
-    y += 3;
+    y += 6;
 
-    heading(t.costSavingsPerCase);
+    label('2.2', t.costSavingsPerCase);
     kv(t.costSavingsPerCase, eur(perCase.costSavedPerCase));
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...GRAY);
     doc.text(`= (${perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) x ${hourlyRate} ${t.eurPerHour}`, M, y);
-    y += 8;
+    y += 10;
 
-    heading(t.breakEvenLabel);
+    label('2.3', t.breakEvenLabel);
     if (breakEven) {
       kv(t.breakEvenDate, formatMonthLabel(breakEven.month, language));
       kv(t.breakEvenDuration, breakEven.monthsCount + ' ' + t.months);
@@ -403,9 +543,9 @@ export const Results: React.FC = () => {
       doc.text(t.breakEvenNotReached, M, y);
       y += 5;
     }
-    y += 3;
+    y += 6;
 
-    heading(t.roiLabel);
+    label('2.4', t.roiLabel);
     if (roi !== null && timeSeries.length > 0) {
       kv('ROI', roi.toFixed(1) + ' %');
       kv(t.roiPeriod, formatMonthLabel(timeSeries[0].month, language) + ' – ' + formatMonthLabel(timeSeries[timeSeries.length - 1].month, language) + ` (${timeSeries.length} ${t.months})`);
@@ -416,19 +556,26 @@ export const Results: React.FC = () => {
       y += 5;
     }
 
+    // Separator line + spacing before charts
+    y += 12;
+    doc.setDrawColor(...LINE);
+    doc.setLineWidth(0.3);
+    doc.line(M, y, M + W, y);
+    y += 14;
+
     // ═══ CHARTS — sequential, flowing after results ═══
     const chartIds = [
-      { id: 'chart-monthly-time', title: t.monthlyTimeTitle },
-      { id: 'chart-cum-time', title: t.timeProjectionTitle },
-      { id: 'chart-monthly-eur', title: t.monthlyEurTitle },
-      { id: 'chart-cum-eur', title: t.eurProjectionTitle },
+      { id: 'chart-monthly-time', num: '2.5', title: t.monthlyTimeTitle },
+      { id: 'chart-cum-time', num: '2.6', title: t.timeProjectionTitle },
+      { id: 'chart-monthly-eur', num: '2.7', title: t.monthlyEurTitle },
+      { id: 'chart-cum-eur', num: '2.8', title: t.eurProjectionTitle },
     ];
 
     // Capture all charts first
-    const chartImages: { title: string; img: string; w: number; h: number }[] = [];
+    const chartImages: { num: string; title: string; img: string; w: number; h: number }[] = [];
     for (const chart of chartIds) {
       const result = await captureChart(chart.id);
-      if (result) chartImages.push({ title: chart.title, ...result });
+      if (result) chartImages.push({ num: chart.num, title: chart.title, ...result });
     }
 
     const MAX_CHART_H = 110;
@@ -444,14 +591,13 @@ export const Results: React.FC = () => {
         pageHeader();
         y = 22;
       }
-      y += 4;
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...INK);
-      doc.text(ci.title, M, y);
-      y += 3;
+      label(ci.num, ci.title);
       doc.addImage(ci.img, 'PNG', M, y, W, chartH);
-      y += chartH + 6;
+      y += chartH + 8;
+      doc.setDrawColor(...LINE);
+      doc.setLineWidth(0.15);
+      doc.line(M, y, M + W, y);
+      y += 10;
     }
 
     addFooter();
@@ -837,19 +983,22 @@ export const Results: React.FC = () => {
               {t.noIntervalsWarning}
             </div>
           ) : (
-            <div id="chart-monthly-time" className="h-80 mt-6">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyTimeData} margin={{ left: 10, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
-                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                    label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
-                  <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
-                  <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" />
-                  <Bar dataKey={t.monthlyBuergerH} fill="#999999" />
-                </BarChart>
-              </ResponsiveContainer>
+            <div id="chart-monthly-time" className="mt-6">
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyTimeData} margin={{ left: 10, right: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                    <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                    <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                    <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" />
+                    <Bar dataKey={t.monthlyBuergerH} fill="#999999" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {intervalLabels}
             </div>
           )}
         </div>
@@ -882,27 +1031,30 @@ export const Results: React.FC = () => {
                 </button>
               </div>
 
-              <div id="chart-cum-time" className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={timeChartData} margin={{ left: 10, right: 30 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                    <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                      interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
-                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                      label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
-                    <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
-                    {showMitarbeiter && (
-                      <Line type="monotone" dataKey={t.mitarbeiterHoursFreed} stroke="#111111" strokeWidth={2}
-                        dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
-                        activeDot={{ r: 5, fill: '#111111' }} />
-                    )}
-                    {showBuerger && (
-                      <Line type="monotone" dataKey={t.buergerHoursFreed} stroke="#666666" strokeWidth={2} strokeDasharray="4 2"
-                        dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#666666', strokeWidth: 2 } : false}
-                        activeDot={{ r: 5, fill: '#666666' }} />
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
+              <div id="chart-cum-time">
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={timeChartData} margin={{ left: 10, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                      <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                        interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                      <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                        label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                      <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                      {showMitarbeiter && (
+                        <Line type="monotone" dataKey={t.mitarbeiterHoursFreed} stroke="#111111" strokeWidth={2}
+                          dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
+                          activeDot={{ r: 5, fill: '#111111' }} />
+                      )}
+                      {showBuerger && (
+                        <Line type="monotone" dataKey={t.buergerHoursFreed} stroke="#666666" strokeWidth={2} strokeDasharray="4 2"
+                          dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#666666', strokeWidth: 2 } : false}
+                          activeDot={{ r: 5, fill: '#666666' }} />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {intervalLabels}
               </div>
             </>
           )}
@@ -921,20 +1073,23 @@ export const Results: React.FC = () => {
               {t.noIntervalsWarning}
             </div>
           ) : (
-            <div id="chart-monthly-eur" className="h-80 mt-6">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyEurData} margin={{ left: 10, right: 30 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
-                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                    tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
-                    label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
-                  <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" />
-                  <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
-                  <Bar dataKey={t.monthlyNetSavings} fill="#111111" />
-                </BarChart>
-              </ResponsiveContainer>
+            <div id="chart-monthly-eur" className="mt-6">
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyEurData} margin={{ left: 10, right: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                    <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                      label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                    <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" />
+                    <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                    <Bar dataKey={t.monthlyNetSavings} fill="#111111" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {intervalLabels}
             </div>
           )}
           <div className="flex items-start mt-4 pt-4 border-t border-hb-line/50">
@@ -959,35 +1114,38 @@ export const Results: React.FC = () => {
             <>
               {/* Summary line */}
               <p className="text-xs text-hb-gray font-light mt-2 mb-6">
-                {t.totalOneTimeCosts}: {totalOneTime.toLocaleString(locale)} € &middot; {t.totalAnnualCosts}: {totalAnnual.toLocaleString(locale)} € / Jahr
+                {t.totalOneTimeCosts}: {totalOneTime.toLocaleString(locale)} € &middot; {t.totalAnnualCosts}: {totalAnnual.toLocaleString(locale)} € {language === 'de' ? '/ Jahr' : '/ year'}
               </p>
 
-              <div id="chart-cum-eur" className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={eurChartData} margin={{ left: 10, right: 30 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                    <XAxis dataKey="idx" type="number" domain={[0, timeSeries.length - 1]}
-                      ticks={eurChartData.map(d => d.idx)}
-                      tickFormatter={(i: number) => eurChartData[i]?.month ?? ''}
-                      stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                      interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
-                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
-                      tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
-                      label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
-                    <ReferenceLine y={0} stroke="#666666" strokeWidth={1.5} strokeDasharray="6 3" />
-                    {breakEvenPoint && (
-                      <ReferenceDot x={breakEvenPoint.x} y={0}
-                        r={6} fill="#111111" stroke="#FFFFFF" strokeWidth={2}
-                        label={{ value: breakEvenPoint.label, fill: '#111111', fontSize: 10, fontWeight: 600, position: 'top', offset: 14 }} />
-                    )}
-                    <Tooltip {...tooltipStyle}
-                      labelFormatter={(i: number) => eurChartData[i]?.month ?? ''}
-                      formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
-                    <Line type="monotone" dataKey={t.cumulativeNetSavings} stroke="#111111" strokeWidth={2}
-                      dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
-                      activeDot={{ r: 5, fill: '#111111' }} />
-                  </LineChart>
-                </ResponsiveContainer>
+              <div id="chart-cum-eur">
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={eurChartData} margin={{ left: 10, right: 30 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                      <XAxis dataKey="idx" type="number" domain={[0, timeSeries.length - 1]}
+                        ticks={eurChartData.map(d => d.idx)}
+                        tickFormatter={(i: number) => eurChartData[i]?.month ?? ''}
+                        stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                        interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                      <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                        tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                        label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                      <ReferenceLine y={0} stroke="#666666" strokeWidth={1.5} strokeDasharray="6 3" />
+                      {breakEvenPoint && (
+                        <ReferenceDot x={breakEvenPoint.x} y={0}
+                          r={6} fill="#111111" stroke="#FFFFFF" strokeWidth={2}
+                          label={{ value: breakEvenPoint.label, fill: '#111111', fontSize: 10, fontWeight: 600, position: 'top', offset: 14 }} />
+                      )}
+                      <Tooltip {...tooltipStyle}
+                        labelFormatter={(i: number) => eurChartData[i]?.month ?? ''}
+                        formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                      <Line type="monotone" dataKey={t.cumulativeNetSavings} stroke="#111111" strokeWidth={2}
+                        dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
+                        activeDot={{ r: 5, fill: '#111111' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                {intervalLabels}
               </div>
             </>
           )}
