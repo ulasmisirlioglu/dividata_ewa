@@ -13,3 +13,11 @@ dist
 .DS_Store
 *.log
 .vscode
+
+# reference documents
+Berechnungslogik_DiviData_eWA.pdf
+Berechnungslogik_v2.pdf
+Berechnungslogik_v3.pdf
+DiviData Datenschutzerklaerung.docx
+DiviData Impressum.docx
+analog-wohnsitzanmeldung-bpmn (1).svg

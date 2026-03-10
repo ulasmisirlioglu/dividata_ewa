@@ -7,7 +7,6 @@ interface Translation {
   navDashboard: string;
   navAnalog: string;
   navEvaluation: string;
-  navCosts: string;
   navParams: string;
   navResults: string;
 
@@ -262,7 +261,6 @@ const translations: Record<Language, Translation> = {
     navDashboard: 'Dashboard',
     navAnalog: 'Analoger Prozess',
     navEvaluation: 'Digitaler Prozess',
-    navCosts: 'Kosten der Digitalisierung',
     navParams: 'Prozessparameter',
     navResults: 'Ergebnisse',
 
@@ -496,7 +494,6 @@ const translations: Record<Language, Translation> = {
     navDashboard: 'Dashboard',
     navAnalog: 'Analog Process',
     navEvaluation: 'Digital Process',
-    navCosts: 'Digitalization Costs',
     navParams: 'Process Parameters',
     navResults: 'Results',
 

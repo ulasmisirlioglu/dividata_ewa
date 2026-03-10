@@ -9,7 +9,6 @@ export default {
       colors: {
         hb: {
           paper: '#F7F7F7', // Main background
-          white: '#FFFFFF',
           ink: '#111111',   // Primary text
           gray: '#666666',  // Secondary text
           line: '#E0E0E0',  // Borders/Grid lines

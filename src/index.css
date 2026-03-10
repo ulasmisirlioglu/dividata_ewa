@@ -44,12 +44,6 @@
     @apply py-4 border-b border-hb-line text-sm font-light text-hb-ink;
   }
 
-  /* Editorial Grid Lines */
-  .grid-lines {
-    background-image: linear-gradient(to right, #E0E0E0 1px, transparent 1px);
-    background-size: 25% 100%; /* 4 columns */
-  }
-  
   .animate-fade-in {
     animation: fadeIn 0.8s ease-out forwards;
   }

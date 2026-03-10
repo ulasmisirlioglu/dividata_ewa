@@ -34,7 +34,7 @@ export interface ProjectRow {
   updated_at: string;
 }
 
-export interface DefaultBpmnRow {
+interface DefaultBpmnRow {
   id: string;
   user_id: string;
   use_case: string;

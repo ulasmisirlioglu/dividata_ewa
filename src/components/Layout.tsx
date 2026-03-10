@@ -7,7 +7,7 @@ import { useStore } from '../store/useStore';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { ROUTES } from '../lib/routes';
 
-export const Navbar: React.FC = () => {
+const Navbar: React.FC = () => {
   const saveStatus = useStore(s => s.saveStatus);
   const currentProjectId = useStore(s => s.currentProjectId);
   const { t } = useLangStore();
@@ -34,7 +34,7 @@ export const Navbar: React.FC = () => {
   );
 };
 
-export const Sidebar: React.FC = () => {
+const Sidebar: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { t } = useLangStore();

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
@@ -13,14 +13,13 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
   Download, ArrowLeft, ChevronDown,
-  Plus, X, Info,
+  Plus, X, Info, Pencil,
 } from 'lucide-react';
 import clsx from 'clsx';
 // @ts-ignore
 import NavigatedViewer from 'bpmn-js/lib/NavigatedViewer';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
-import { Pencil } from 'lucide-react';
 
 import type { DigitalizationCosts } from '../store/useStore';
 import { calculatePerCaseSavings, generateTimeSeries } from '../lib/calculations';
@@ -322,7 +321,8 @@ export const Results: React.FC = () => {
       const tempViewer = new NavigatedViewer({ container: tempBpmn });
       try {
         await tempViewer.importXML(bpmnXml);
-        const bpmnCanvas = tempViewer.get('canvas');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const bpmnCanvas = tempViewer.get<any>('canvas');
         bpmnCanvas.zoom('fit-viewport');
         bpmnCanvas.zoom(bpmnCanvas.zoom() * 0.85);
         // Hide bpmn.io watermark

@@ -2,7 +2,7 @@ import type { StepDuration, DigitalStep, ProcessInterval, DigitalizationCosts } 
 
 /* ─── helpers ─── */
 
-export function nextMonth(yyyyMm: string): string {
+function nextMonth(yyyyMm: string): string {
   const [y, m] = yyyyMm.split('-').map(Number);
   if (m === 12) return `${y + 1}-01`;
   return `${y}-${String(m + 1).padStart(2, '0')}`;
@@ -10,7 +10,7 @@ export function nextMonth(yyyyMm: string): string {
 
 /* ─── per-case savings ─── */
 
-export interface PerCaseSavings {
+interface PerCaseSavings {
   mitarbeiterMinutesSaved: number;
   buergerMinutesSaved: number;
   costSavedPerCase: number;
@@ -41,7 +41,7 @@ export function calculatePerCaseSavings(
 
 /* ─── monthly time-series ─── */
 
-export interface MonthlyPoint {
+interface MonthlyPoint {
   month: string;
   mitarbeiterH: number;
   buergerH: number;
@@ -104,7 +104,7 @@ export function generateTimeSeries(
 
 /* ─── compute all derived DB columns from store state ─── */
 
-export interface ProjectDerivedValues {
+interface ProjectDerivedValues {
   analog_cost_per_process: number;
   analog_mitarbeiter_minutes: number;
   analog_buerger_minutes: number;

@@ -62,7 +62,7 @@ export const AnalogProcess: React.FC = () => {
     <Layout>
       <div className="max-w-6xl mx-auto animate-fade-in">
         {/* Step Tabs */}
-        <div className="mb-10 flex space-x-8 border-b border-hummingbird-border pb-4">
+        <div className="mb-10 flex space-x-8 border-b border-hb-line pb-4">
           {[1, 2, 3].map((step) => (
              <button 
               key={step}
