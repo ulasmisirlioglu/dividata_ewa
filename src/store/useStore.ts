@@ -225,7 +225,7 @@ export const useStore = create<StoreState>((set) => ({
 
   // Data
   municipalityName: '',
-  useCase: 'Elektronische Wohnsitzanmeldung (eWA)',
+  useCase: 'eWA',
   bpmnXml: initialBpmnXml,
   stepDurations: defaultStepDurations,
   salaryGroup: '',
@@ -370,7 +370,7 @@ export const useStore = create<StoreState>((set) => ({
     projectName: '',
     saveStatus: 'idle',
     municipalityName: '',
-    useCase: 'Elektronische Wohnsitzanmeldung (eWA)',
+    useCase: 'eWA',
     bpmnXml: initialBpmnXml,
     stepDurations: defaultStepDurations,
     salaryGroup: '',

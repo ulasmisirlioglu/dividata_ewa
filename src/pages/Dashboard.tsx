@@ -47,13 +47,13 @@ export const Dashboard: React.FC = () => {
       });
       store.reset();
       store.setMunicipalityName(stadtname);
-      store.setUseCase('Elektronische Wohnsitzanmeldung (eWA)');
+      store.setUseCase('eWA');
       store.setCurrentProjectId(row.id);
       store.setProjectName(row.project_name);
 
       // Load user's custom default BPMN for this use case (if any)
       try {
-        const customBpmn = await getDefaultBpmn(userId, 'Elektronische Wohnsitzanmeldung (eWA)');
+        const customBpmn = await getDefaultBpmn(userId, 'eWA');
         if (customBpmn) {
           store.setBpmnXml(customBpmn);
         }
