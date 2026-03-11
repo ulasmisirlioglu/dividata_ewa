@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, parseBpmnXml } from '../store/useStore';
+import { useStore, parseBpmnXml, isMitarbeiter, isBuerger } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
 import { ArrowRight, ArrowLeft, Info } from 'lucide-react';
@@ -40,15 +40,21 @@ export const Evaluation: React.FC = () => {
     return step ? step.actual : 0;
   };
 
-  const getActor = (id: string) => {
+  const getActorRaw = (id: string) => {
     const step = stepDurations.find(s => s.id === id);
-    return step ? step.actor : '';
+    return step ? step.actor : null;
+  };
+  const getActor = (id: string) => {
+    const actor = getActorRaw(id);
+    if (!actor) return '';
+    if (actor === 'Beide') return `${t.employeeLabel} & ${t.citizenLabel}`;
+    return actor;
   };
 
   // Calculate digital Mitarbeiterkosten pro Prozess
   const digitalMitarbeiterMin = digitalSteps.reduce((acc, s) => {
     const step = stepDurations.find(sd => sd.id === s.id);
-    if (!step || step.actor !== 'Mitarbeiter') return acc;
+    if (!step || !isMitarbeiter(step.actor)) return acc;
     return acc + s.digitalDuration;
   }, 0);
   const digitalPersonnelCostPerProcess = (digitalMitarbeiterMin / 60) * hourlyRate;
@@ -179,12 +185,12 @@ export const Evaluation: React.FC = () => {
                     </tr>
                     <tr className="bg-hb-paper border-t border-hb-line/50">
                       <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
-                        {filteredAnalog.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin}<br/>
-                        + {filteredAnalog.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
+                        {filteredAnalog.filter(s => isMitarbeiter(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin}<br/>
+                        + {filteredAnalog.filter(s => isBuerger(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
                       </td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink font-medium whitespace-nowrap">
-                        {filteredDigital.filter(s => getActor(s.id) === 'Mitarbeiter').reduce((acc, s) => acc + s.digitalDuration, 0)} {t.employeeMin}<br/>
-                        + {filteredDigital.filter(s => getActor(s.id) === 'Bürger').reduce((acc, s) => acc + s.digitalDuration, 0)} {t.citizenMin}
+                        {filteredDigital.filter(s => { const a = getActorRaw(s.id); return a && isMitarbeiter(a); }).reduce((acc, s) => acc + s.digitalDuration, 0)} {t.employeeMin}<br/>
+                        + {filteredDigital.filter(s => { const a = getActorRaw(s.id); return a && isBuerger(a); }).reduce((acc, s) => acc + s.digitalDuration, 0)} {t.citizenMin}
                       </td>
                     </tr>
                   </tfoot>

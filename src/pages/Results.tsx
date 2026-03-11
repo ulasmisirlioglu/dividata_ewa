@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore } from '../store/useStore';
+import { useStore, isMitarbeiter, isBuerger } from '../store/useStore';
 import { useLangStore } from '../store/useLangStore';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -62,7 +62,7 @@ export const Results: React.FC = () => {
   const store = useStore();
   const {
     useCase, bpmnXml,
-    stepDurations, setStepDuration, setStepActor,
+    stepDurations, setStepDuration, setStepActor, toggleStepActor,
     digitalSteps, setDigitalStep,
     salaryGroup, setSalaryGroup, hourlyRate, setHourlyRate,
     digitalizationCosts, setDigitalizationCosts,
@@ -203,7 +203,13 @@ export const Results: React.FC = () => {
   ) : null;
 
   // Helper to get actor for a digital step
-  const getActor = (id: string) => stepDurations.find(s => s.id === id)?.actor ?? '';
+  const getActorRaw = (id: string) => stepDurations.find(s => s.id === id)?.actor ?? null;
+  const getActor = (id: string) => {
+    const actor = getActorRaw(id);
+    if (!actor) return '';
+    if (actor === 'Beide') return `${t.employeeLabel} & ${t.citizenLabel}`;
+    return actor;
+  };
   const getAnalogDur = (id: string) => stepDurations.find(s => s.id === id)?.actual ?? 0;
 
   // Cost table fields
@@ -366,14 +372,17 @@ export const Results: React.FC = () => {
       doc.setTextColor(...INK);
       doc.text(doc.splitTextToSize(step.name, 90)[0], M, y);
       doc.setTextColor(...GRAY);
-      doc.text(step.actor, M + 95, y);
+      const actorLabel = step.actor === 'Beide'
+        ? (language === 'de' ? 'Mitarbeiter & Bürger' : 'Employee & Citizen')
+        : step.actor;
+      doc.text(actorLabel, M + 95, y);
       doc.setTextColor(...INK);
       doc.text(step.actual.toString(), M + W, y, { align: 'right' });
       y += 4.5;
     }
     // Analog sums
-    const analogMitarbeiterMin = stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((a, s) => a + s.actual, 0);
-    const analogBuergerMin = stepDurations.filter(s => s.actor === 'Bürger').reduce((a, s) => a + s.actual, 0);
+    const analogMitarbeiterMin = stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((a, s) => a + s.actual, 0);
+    const analogBuergerMin = stepDurations.filter(s => isBuerger(s.actor)).reduce((a, s) => a + s.actual, 0);
     y += 1;
     doc.setDrawColor(...LINE);
     doc.line(M + W - 30, y, M + W, y);
@@ -435,8 +444,8 @@ export const Results: React.FC = () => {
       y += 4.5;
     }
     // Digital sums
-    const digitalMitarbeiterMin = digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Mitarbeiter').reduce((a, d) => a + d.digitalDuration, 0);
-    const digitalBuergerMin = digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Bürger').reduce((a, d) => a + d.digitalDuration, 0);
+    const digitalMitarbeiterMin = digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isMitarbeiter(a); }).reduce((a, d) => a + d.digitalDuration, 0);
+    const digitalBuergerMin = digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isBuerger(a); }).reduce((a, d) => a + d.digitalDuration, 0);
     y += 1;
     doc.setDrawColor(...LINE);
     doc.line(M + W - 30, y, M + W, y);
@@ -664,14 +673,14 @@ export const Results: React.FC = () => {
                       <td className="hb-table-cell px-4">
                         <div className="flex justify-center gap-1">
                           <button
-                            onClick={() => setStepActor(step.id, 'Mitarbeiter')}
+                            onClick={() => toggleStepActor(step.id, 'Mitarbeiter')}
                             className={clsx('px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
-                              step.actor === 'Mitarbeiter' ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
+                              isMitarbeiter(step.actor) ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
                           >{t.employeeLabel}</button>
                           <button
-                            onClick={() => setStepActor(step.id, 'Bürger')}
+                            onClick={() => toggleStepActor(step.id, 'Bürger')}
                             className={clsx('px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
-                              step.actor === 'Bürger' ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
+                              isBuerger(step.actor) ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
                           >{t.citizenLabel}</button>
                         </div>
                       </td>
@@ -882,14 +891,14 @@ export const Results: React.FC = () => {
                 <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.mitarbeiterMinSaved}</h4>
                 <p className="text-3xl font-display text-hb-ink">{perCase.mitarbeiterMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
                 <p className="text-xs text-hb-gray/60 mt-1 font-mono">
-                  {stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Mitarbeiter').reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                  {stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isMitarbeiter(a); }).reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
                 </p>
               </div>
               <div className="border-l-2 border-l-hb-line pl-6">
                 <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.buergerMinSaved}</h4>
                 <p className="text-3xl font-display text-hb-ink">{perCase.buergerMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
                 <p className="text-xs text-hb-gray/60 mt-1 font-mono">
-                  {stepDurations.filter(s => s.actor === 'Bürger').reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Bürger').reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                  {stepDurations.filter(s => isBuerger(s.actor)).reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isBuerger(a); }).reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
                 </p>
               </div>
             </div>

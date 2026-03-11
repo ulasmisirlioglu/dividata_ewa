@@ -2,7 +2,17 @@ import { create } from 'zustand';
 import { initialBpmnXml } from '../assets/initialBpmn';
 import type { ProjectRow } from '../lib/database.types';
 
-export type StepActor = 'Mitarbeiter' | 'Bürger';
+export type StepActor = 'Mitarbeiter' | 'Bürger' | 'Beide';
+
+/** Returns true when the step involves Mitarbeiter work */
+export function isMitarbeiter(actor: StepActor): boolean {
+  return actor === 'Mitarbeiter' || actor === 'Beide';
+}
+
+/** Returns true when the step involves Bürger work */
+export function isBuerger(actor: StepActor): boolean {
+  return actor === 'Bürger' || actor === 'Beide';
+}
 
 /** Parse BPMN XML → valid process tasks vs abort-path tasks, sorted by sequence flow order */
 export function parseBpmnXml(xml: string) {
@@ -97,9 +107,25 @@ export function parseBpmnXml(xml: string) {
   const sortByFlow = (a: { id: string }, b: { id: string }) =>
     (flowOrder.get(a.id) ?? 0) - (flowOrder.get(b.id) ?? 0);
 
+  // Extract lane → task mapping to determine actor from BPMN
+  const laneActorMap = new Map<string, StepActor>();
+  const laneRegex = /<bpmn:lane\s[^>]*?name="([^"]*)"[^>]*>([\s\S]*?)<\/bpmn:lane>/g;
+  while ((m = laneRegex.exec(xml)) !== null) {
+    const laneName = m[1];
+    const laneBody = m[2];
+    const isBuergerLane = /bürger|citizen|warte/i.test(laneName);
+    const actor: StepActor = isBuergerLane ? 'Bürger' : 'Mitarbeiter';
+    const refRegex = /<bpmn:flowNodeRef>([^<]+)<\/bpmn:flowNodeRef>/g;
+    let ref;
+    while ((ref = refRegex.exec(laneBody)) !== null) {
+      laneActorMap.set(ref[1], actor);
+    }
+  }
+
   return {
     validTasks: allTasks.filter((t) => !abortNodes.has(t.id)).sort(sortByFlow),
     excludedTasks: allTasks.filter((t) => abortNodes.has(t.id)),
+    laneActorMap,
   };
 }
 
@@ -164,6 +190,7 @@ export interface StoreState {
   setBpmnXml: (xml: string) => void;
   setStepDuration: (id: string, duration: number) => void;
   setStepActor: (id: string, actor: StepActor) => void;
+  toggleStepActor: (id: string, clickedActor: 'Mitarbeiter' | 'Bürger') => void;
   setSalaryGroup: (group: string) => void;
   setHourlyRate: (rate: number) => void;
   setMonthlyVolume: (volume: number) => void;
@@ -248,7 +275,7 @@ export const useStore = create<StoreState>((set) => ({
   setMunicipalityName: (name) => set({ municipalityName: name }),
   setUseCase: (useCase) => set({ useCase: useCase }),
   setBpmnXml: (xml) => set((state) => {
-    const { validTasks } = parseBpmnXml(xml);
+    const { validTasks, laneActorMap } = parseBpmnXml(xml);
 
     const validIds = new Set(validTasks.map((t) => t.id));
     const nameMap = new Map(validTasks.map((t) => [t.id, t.name]));
@@ -265,7 +292,7 @@ export const useStore = create<StoreState>((set) => ({
       });
     for (const task of validTasks) {
       if (!existingStepIds.has(task.id)) {
-        updatedSteps.push({ id: task.id, name: task.name, actual: 0, actor: 'Mitarbeiter' as StepActor });
+        updatedSteps.push({ id: task.id, name: task.name, actual: 0, actor: laneActorMap.get(task.id) ?? 'Mitarbeiter' as StepActor });
       }
     }
     // Sort to match BPMN XML order
@@ -298,6 +325,21 @@ export const useStore = create<StoreState>((set) => ({
   })),
   setStepActor: (id, actor) => set((state) => ({
     stepDurations: state.stepDurations.map((s) => s.id === id ? { ...s, actor } : s)
+  })),
+  toggleStepActor: (id, clickedActor) => set((state) => ({
+    stepDurations: state.stepDurations.map((s) => {
+      if (s.id !== id) return s;
+      const cur = s.actor;
+      // Can't deselect the only selected actor
+      if (cur === clickedActor) return s;
+      // Clicking the other single actor → combine to Beide
+      if (cur === 'Mitarbeiter' && clickedActor === 'Bürger') return { ...s, actor: 'Beide' as StepActor };
+      if (cur === 'Bürger' && clickedActor === 'Mitarbeiter') return { ...s, actor: 'Beide' as StepActor };
+      // Currently Beide, clicking one removes it
+      if (cur === 'Beide' && clickedActor === 'Mitarbeiter') return { ...s, actor: 'Bürger' as StepActor };
+      if (cur === 'Beide' && clickedActor === 'Bürger') return { ...s, actor: 'Mitarbeiter' as StepActor };
+      return s;
+    }),
   })),
   setSalaryGroup: (group) => set({ salaryGroup: group }),
   setHourlyRate: (rate) => set({ hourlyRate: rate }),

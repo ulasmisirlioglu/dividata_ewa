@@ -197,6 +197,7 @@ interface Translation {
   // Actor labels
   employeeLabel: string;
   citizenLabel: string;
+  bothLabel: string;
   employeeMin: string;
   citizenMin: string;
 
@@ -442,6 +443,7 @@ const translations: Record<Language, Translation> = {
 
     employeeLabel: 'Mitarbeiter',
     citizenLabel: 'Bürger',
+    bothLabel: 'Beide',
     employeeMin: 'Mitarbeiter-Min.',
     citizenMin: 'Bürger-Min.',
 
@@ -675,6 +677,7 @@ const translations: Record<Language, Translation> = {
 
     employeeLabel: 'Employee',
     citizenLabel: 'Citizen',
+    bothLabel: 'Both',
     employeeMin: 'Employee min.',
     citizenMin: 'Citizen min.',
 

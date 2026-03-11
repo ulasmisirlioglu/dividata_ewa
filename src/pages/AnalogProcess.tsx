@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStore, parseBpmnXml } from '../store/useStore';
+import { useStore, parseBpmnXml, isMitarbeiter, isBuerger } from '../store/useStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useLangStore } from '../store/useLangStore';
 import { Layout } from '../components/Layout';
@@ -15,7 +15,7 @@ export const AnalogProcess: React.FC = () => {
   const navigate = useNavigate();
   const {
     bpmnXml, setBpmnXml,
-    stepDurations, setStepDuration, setStepActor,
+    stepDurations, setStepDuration, setStepActor, toggleStepActor,
     salaryGroup, setSalaryGroup,
     hourlyRate, setHourlyRate,
   } = useStore();
@@ -127,10 +127,10 @@ export const AnalogProcess: React.FC = () => {
                         <td className="hb-table-cell px-6">
                           <div className="flex justify-center gap-1">
                             <button
-                              onClick={() => setStepActor(step.id, 'Mitarbeiter')}
+                              onClick={() => toggleStepActor(step.id, 'Mitarbeiter')}
                               className={clsx(
                                 'px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
-                                step.actor === 'Mitarbeiter'
+                                isMitarbeiter(step.actor)
                                   ? 'bg-hb-ink text-white border-hb-ink'
                                   : 'bg-transparent text-hb-gray hover:bg-hb-paper'
                               )}
@@ -138,10 +138,10 @@ export const AnalogProcess: React.FC = () => {
                               {t.employeeLabel}
                             </button>
                             <button
-                              onClick={() => setStepActor(step.id, 'Bürger')}
+                              onClick={() => toggleStepActor(step.id, 'Bürger')}
                               className={clsx(
                                 'px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
-                                step.actor === 'Bürger'
+                                isBuerger(step.actor)
                                   ? 'bg-hb-ink text-white border-hb-ink'
                                   : 'bg-transparent text-hb-gray hover:bg-hb-paper'
                               )}
@@ -164,7 +164,7 @@ export const AnalogProcess: React.FC = () => {
                     <tr className="bg-hb-paper font-semibold">
                       <td className="hb-table-cell px-6" colSpan={2}>{t.totalDuration}</td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
-                        {filteredSteps.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin} + {filteredSteps.filter(s => s.actor === 'Bürger').reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
+                        {filteredSteps.filter(s => isMitarbeiter(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin} + {filteredSteps.filter(s => isBuerger(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
                       </td>
                     </tr>
                   </tbody>
@@ -225,7 +225,7 @@ export const AnalogProcess: React.FC = () => {
 
               {/* Cost calculation */}
               {(() => {
-                const mitarbeiterMin = stepDurations.filter(s => s.actor === 'Mitarbeiter').reduce((acc, s) => acc + s.actual, 0);
+                const mitarbeiterMin = stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((acc, s) => acc + s.actual, 0);
                 const rate = hourlyRate || 0;
                 const costPerProcess = (mitarbeiterMin / 60) * rate;
                 return (

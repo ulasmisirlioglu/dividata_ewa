@@ -1,4 +1,5 @@
 import type { StepDuration, DigitalStep, ProcessInterval, DigitalizationCosts } from '../store/useStore';
+import { isMitarbeiter, isBuerger } from '../store/useStore';
 
 /* ─── helpers ─── */
 
@@ -28,8 +29,8 @@ export function calculatePerCaseSavings(
     const ds = digitalSteps.find(d => d.id === step.id);
     if (!ds) continue;
     const saved = step.actual - ds.digitalDuration;
-    if (step.actor === 'Mitarbeiter') mitarbeiterSaved += saved;
-    else buergerSaved += saved;
+    if (isMitarbeiter(step.actor)) mitarbeiterSaved += saved;
+    if (isBuerger(step.actor)) buergerSaved += saved;
   }
 
   return {
@@ -131,10 +132,10 @@ export function computeProjectDerivedValues(state: {
 
   // Analog minutes
   const analogMitarbeiterMin = stepDurations
-    .filter(s => s.actor === 'Mitarbeiter')
+    .filter(s => isMitarbeiter(s.actor))
     .reduce((acc, s) => acc + s.actual, 0);
   const analogBuergerMin = stepDurations
-    .filter(s => s.actor === 'Bürger')
+    .filter(s => isBuerger(s.actor))
     .reduce((acc, s) => acc + s.actual, 0);
   const analogCostPerProcess = (analogMitarbeiterMin / 60) * hourlyRate;
 
@@ -144,9 +145,10 @@ export function computeProjectDerivedValues(state: {
   for (const ds of digitalSteps) {
     const step = stepDurations.find(s => s.id === ds.id);
     if (!step) continue;
-    if (step.actor === 'Mitarbeiter') {
+    if (isMitarbeiter(step.actor)) {
       digitalMitarbeiterMin += ds.digitalDuration;
-    } else {
+    }
+    if (isBuerger(step.actor)) {
       digitalBuergerMin += ds.digitalDuration;
     }
   }
