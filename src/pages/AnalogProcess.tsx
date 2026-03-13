@@ -15,7 +15,7 @@ export const AnalogProcess: React.FC = () => {
   const navigate = useNavigate();
   const {
     bpmnXml, setBpmnXml,
-    stepDurations, setStepDuration, setStepActor, toggleStepActor,
+    stepDurations, setStepDuration, setStepActualBuerger, setStepActor, toggleStepActor,
     salaryGroup, setSalaryGroup,
     hourlyRate, setHourlyRate,
   } = useStore();
@@ -88,6 +88,18 @@ export const AnalogProcess: React.FC = () => {
                 <h2 className="text-3xl font-light mb-2">{t.mapProcessHeading}</h2>
                 <p className="text-hb-gray font-light">{t.mapProcessDesc}</p>
               </div>
+              <div className="flex items-start bg-white border border-hb-line p-5 mb-6">
+                <Info className="h-5 w-5 text-hb-ink mt-0.5 flex-shrink-0" />
+                <p className="ml-4 text-sm text-hb-gray leading-relaxed font-light">
+                  <span className="font-medium text-hb-ink block mb-1">{t.bpmnInfoTitle}</span>
+                  {t.bpmnInfoDesc.split(/(\{employee\}|\{citizen\})/).map((part, i) =>
+                    part === '{employee}' ? <span key={i} className="font-medium text-hb-ink">{t.employeeLabel}</span> :
+                    part === '{citizen}' ? <span key={i} className="font-medium text-hb-ink">{t.citizenLabel}</span> :
+                    <React.Fragment key={i}>{part}</React.Fragment>
+                  )}
+                </p>
+              </div>
+
               <div className="rounded-none overflow-hidden border border-hb-line shadow-2xl shadow-black/5">
                  {/* Wrapper for the white editor to make it look like a page */}
                 <BPMNEditor
@@ -121,52 +133,81 @@ export const AnalogProcess: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-hb-line">
-                    {filteredSteps.map((step) => (
-                      <tr key={step.id} className="hover:bg-hb-paper transition-colors">
-                        <td className="hb-table-cell px-6 font-medium">{step.name}</td>
-                        <td className="hb-table-cell px-6">
-                          <div className="flex justify-center gap-1">
-                            <button
-                              onClick={() => toggleStepActor(step.id, 'Mitarbeiter')}
-                              className={clsx(
-                                'px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
-                                isMitarbeiter(step.actor)
-                                  ? 'bg-hb-ink text-white border-hb-ink'
-                                  : 'bg-transparent text-hb-gray hover:bg-hb-paper'
+                    {filteredSteps.flatMap((step) => {
+                      const renderRow = (rowActor: 'Mitarbeiter' | 'Bürger') => {
+                        const isMitRow = rowActor === 'Mitarbeiter';
+                        const isBothActors = step.actor === 'Beide';
+                        // actualBuerger is only for the Bürger sub-row when actor === 'Beide'
+                        // single-actor tasks (Mitarbeiter OR Bürger) always use actual
+                        const duration = (isBothActors && !isMitRow) ? step.actualBuerger : step.actual;
+                        const handleDuration = (v: number) =>
+                          (isBothActors && !isMitRow) ? setStepActualBuerger(step.id, v) : setStepDuration(step.id, v);
+                        return (
+                          <tr key={`${step.id}_${rowActor}`} className="hover:bg-hb-paper transition-colors">
+                            <td className="hb-table-cell px-6 font-medium">
+                              {step.name}
+                              {step.actor === 'Beide' && (
+                                <span className="ml-2 text-xs text-hb-gray font-normal">({rowActor})</span>
                               )}
-                            >
-                              {t.employeeLabel}
-                            </button>
-                            <button
-                              onClick={() => toggleStepActor(step.id, 'Bürger')}
-                              className={clsx(
-                                'px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
-                                isBuerger(step.actor)
-                                  ? 'bg-hb-ink text-white border-hb-ink'
-                                  : 'bg-transparent text-hb-gray hover:bg-hb-paper'
-                              )}
-                            >
-                              {t.citizenLabel}
-                            </button>
-                          </div>
-                        </td>
-                        <td className="hb-table-cell px-6 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            value={step.actual || ''}
-                            onChange={(e) => setStepDuration(step.id, parseFloat(e.target.value) || 0)}
-                            className="bg-transparent border-b border-hb-line w-20 text-right focus:border-hb-ink focus:outline-none py-1 transition-colors"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                    <tr className="bg-hb-paper font-semibold">
-                      <td className="hb-table-cell px-6" colSpan={2}>{t.totalDuration}</td>
-                      <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
-                        {filteredSteps.filter(s => isMitarbeiter(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin} + {filteredSteps.filter(s => isBuerger(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
-                      </td>
-                    </tr>
+                            </td>
+                            <td className="hb-table-cell px-6">
+                              <div className="flex justify-center gap-1">
+                                <button
+                                  onClick={() => toggleStepActor(step.id, 'Mitarbeiter')}
+                                  className={clsx(
+                                    'px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
+                                    isMitRow
+                                      ? 'bg-hb-ink text-white border-hb-ink'
+                                      : 'bg-transparent text-hb-gray hover:bg-hb-paper'
+                                  )}
+                                >
+                                  {t.employeeLabel}
+                                </button>
+                                <button
+                                  onClick={() => toggleStepActor(step.id, 'Bürger')}
+                                  className={clsx(
+                                    'px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
+                                    !isMitRow
+                                      ? 'bg-hb-ink text-white border-hb-ink'
+                                      : 'bg-transparent text-hb-gray hover:bg-hb-paper'
+                                  )}
+                                >
+                                  {t.citizenLabel}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="hb-table-cell px-6 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={duration || ''}
+                                onChange={(e) => handleDuration(parseFloat(e.target.value) || 0)}
+                                className="bg-transparent border-b border-hb-line w-20 text-right focus:border-hb-ink focus:outline-none py-1 transition-colors"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      };
+                      return step.actor === 'Beide'
+                        ? [renderRow('Mitarbeiter'), renderRow('Bürger')]
+                        : [renderRow(step.actor === 'Bürger' ? 'Bürger' : 'Mitarbeiter')];
+                    })}
+                    {(() => {
+                      const mitMin = filteredSteps.reduce((acc, s) => isMitarbeiter(s.actor) ? acc + s.actual : acc, 0);
+                      const bueMin = filteredSteps.reduce((acc, s) => {
+                        if (s.actor === 'Bürger') return acc + s.actual;
+                        if (s.actor === 'Beide') return acc + s.actualBuerger;
+                        return acc;
+                      }, 0);
+                      return (
+                        <tr className="bg-hb-paper font-semibold">
+                          <td className="hb-table-cell px-6" colSpan={2}>{t.totalDuration}</td>
+                          <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
+                            {mitMin} {t.employeeMin} + {bueMin} {t.citizenMin}
+                          </td>
+                        </tr>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -225,7 +266,7 @@ export const AnalogProcess: React.FC = () => {
 
               {/* Cost calculation */}
               {(() => {
-                const mitarbeiterMin = stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((acc, s) => acc + s.actual, 0);
+                const mitarbeiterMin = stepDurations.reduce((acc, s) => isMitarbeiter(s.actor) ? acc + s.actual : acc, 0);
                 const rate = hourlyRate || 0;
                 const costPerProcess = (mitarbeiterMin / 60) * rate;
                 return (

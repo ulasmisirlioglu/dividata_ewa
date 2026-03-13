@@ -255,6 +255,10 @@ interface Translation {
   saveStatusSaving: string;
   saveStatusSaved: string;
   saveStatusError: string;
+
+  // BPMN info box
+  bpmnInfoTitle: string;
+  bpmnInfoDesc: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -491,6 +495,9 @@ const translations: Record<Language, Translation> = {
     saveStatusSaving: 'Speichern...',
     saveStatusSaved: 'Automatisch gespeichert',
     saveStatusError: 'Speicherfehler',
+
+    bpmnInfoTitle: 'Bevor Sie fortfahren',
+    bpmnInfoDesc: 'Überprüfen Sie den vorgeschlagenen Prozess und bearbeiten Sie ihn bei Bedarf. Kontrollieren Sie für jeden Schritt den zugewiesenen Akteur und passen Sie ihn ggf. an — Sie können {employee}, {citizen} oder beide auswählen. Mindestens ein Akteur pro Schritt ist erforderlich. Bei beiden Akteuren werden die Dauern im nächsten Schritt separat erfasst.',
   },
   en: {
     navDashboard: 'Dashboard',
@@ -725,6 +732,9 @@ const translations: Record<Language, Translation> = {
     saveStatusSaving: 'Saving...',
     saveStatusSaved: 'Auto-saved',
     saveStatusError: 'Save Error',
+
+    bpmnInfoTitle: 'Before you continue',
+    bpmnInfoDesc: 'Review the suggested process below and edit it if needed. For each task, check the assigned actor and adjust if necessary — you can select {employee}, {citizen}, or both. At least one actor per task is required. When both are selected, durations will be set separately for each actor in the next step.',
   }
 };
 

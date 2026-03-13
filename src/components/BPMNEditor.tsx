@@ -4,8 +4,11 @@ import BpmnModeler from 'bpmn-js/lib/Modeler';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Download, Star } from 'lucide-react';
 import { useLangStore } from '../store/useLangStore';
+import { createRoot, Root } from 'react-dom/client';
+import { useStore, isMitarbeiter, isBuerger } from '../store/useStore';
 
 // Custom palette provider — only essential tools
 class CustomPaletteProvider {
@@ -69,6 +72,56 @@ const CustomPaletteModule = {
   customPaletteProvider: ['type', CustomPaletteProvider]
 };
 
+/** Actor toggle overlay rendered below each bpmn:Task box */
+const ActorOverlay: React.FC<{ taskId: string }> = ({ taskId }) => {
+  const { stepDurations, toggleStepActor } = useStore();
+  const { t } = useLangStore();
+  const step = stepDurations.find(s => s.id === taskId);
+  if (!step) return null;
+
+  const mitActive = isMitarbeiter(step.actor);
+  const bueActive = isBuerger(step.actor);
+
+  const btnStyle = (active: boolean, isLeft: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: '4px 2px',
+    fontSize: '9px',
+    fontWeight: 600,
+    letterSpacing: '0.055em',
+    textTransform: 'uppercase' as const,
+    cursor: 'pointer',
+    background: active ? '#111111' : '#ffffff',
+    color: active ? '#ffffff' : '#888888',
+    border: 'none',
+    borderRight: isLeft ? '1px solid #E0E0E0' : 'none',
+    fontFamily: '"Inter", system-ui, sans-serif',
+    lineHeight: 1,
+    textAlign: 'center' as const,
+    transition: 'background 0.12s, color 0.12s',
+  });
+
+  return (
+    <div style={{
+      display: 'flex',
+      width: '100%',
+      border: '1.5px solid #CBCBCB',
+      borderTop: 'none',
+      borderRadius: '0 0 10px 10px',
+      overflow: 'hidden',
+      pointerEvents: 'all',
+      background: '#ffffff',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
+    }}>
+      <button onClick={(e) => { e.stopPropagation(); toggleStepActor(taskId, 'Mitarbeiter'); }} style={btnStyle(mitActive, true)}>
+        {t.employeeLabel}
+      </button>
+      <button onClick={(e) => { e.stopPropagation(); toggleStepActor(taskId, 'Bürger'); }} style={btnStyle(bueActive, false)}>
+        {t.citizenLabel}
+      </button>
+    </div>
+  );
+};
+
 interface BPMNEditorProps {
   xml: string;
   onSave: (xml: string) => void;
@@ -79,8 +132,29 @@ interface BPMNEditorProps {
 export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefault, setAsDefaultLabel }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
+  const overlayRootsRef = useRef<Root[]>([]);
   const { language } = useLangStore();
   const locale = language === 'de' ? 'de-DE' : 'en-US';
+
+  const refreshOverlays = (modeler: any) => {
+    const elementRegistry = modeler.get('elementRegistry');
+    const overlaysService = modeler.get('overlays');
+    overlaysService.clear();
+    overlayRootsRef.current.forEach(r => r.unmount());
+    overlayRootsRef.current = [];
+
+    elementRegistry.filter((el: any) => el.type === 'bpmn:Task').forEach((element: any) => {
+      const container = document.createElement('div');
+      container.style.cssText = `width:${element.width}px; pointer-events:all; margin:0; padding:0;`;
+      overlaysService.add(element.id, {
+        position: { top: element.height, left: 0 },
+        html: container,
+      });
+      const root = createRoot(container);
+      root.render(<ActorOverlay taskId={element.id} />);
+      overlayRootsRef.current.push(root);
+    });
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -109,6 +183,9 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
         const zoomLevel = canvas.zoom();
         canvas.zoom(zoomLevel * 0.85);
 
+        // Add actor overlays below each task
+        refreshOverlays(modeler);
+
         // Auto-save on every diagram change (name edit, move, add, delete, etc.)
         const eventBus = modeler.get('eventBus');
         eventBus.on('commandStack.changed', async () => {
@@ -118,6 +195,8 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
           } catch (e) {
             console.error('BPMN auto-save failed', e);
           }
+          // Refresh overlays after diagram changes (new tasks, deletions)
+          refreshOverlays(modeler);
         });
       });
     } catch (err) {
@@ -125,6 +204,8 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
     }
 
     return () => {
+      overlayRootsRef.current.forEach(r => r.unmount());
+      overlayRootsRef.current = [];
       modeler.destroy();
     };
   }, []);
@@ -142,67 +223,56 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
   };
 
   const handleDownloadPdf = async () => {
-    if (!modelerRef.current) return;
+    if (!modelerRef.current || !containerRef.current) return;
     try {
-      const canvas = modelerRef.current.get('canvas');
-      const svg: string = canvas.getActiveLayer().innerHTML
-        ? (await modelerRef.current.saveSVG()).svg
-        : '';
-      if (!svg) return;
+      // Hide palette, context pad, and watermark before capture
+      const palette = containerRef.current.querySelector('.djs-palette') as HTMLElement | null;
+      const contextPad = containerRef.current.querySelector('.djs-context-pad') as HTMLElement | null;
+      const badge = containerRef.current.querySelector('.bjs-powered-by') as HTMLElement | null;
+      if (palette) palette.style.display = 'none';
+      if (contextPad) contextPad.style.display = 'none';
+      if (badge) badge.style.display = 'none';
 
-      // Create off-screen canvas to render SVG
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
-      const img = new Image();
+      const captured = await html2canvas(containerRef.current, { backgroundColor: '#FFFFFF', scale: 3 });
 
-      img.onload = () => {
-        // Calculate dimensions to fit A4 landscape with padding
-        const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const pageW = 297;
-        const pageH = 210;
-        const pad = 15;
-        const maxW = pageW - pad * 2;
-        const maxH = pageH - pad * 2 - 20; // room for header
+      // Restore hidden elements
+      if (palette) palette.style.display = '';
+      if (contextPad) contextPad.style.display = '';
+      if (badge) badge.style.display = '';
 
-        const scale = Math.min(maxW / img.width, maxH / img.height);
-        const w = img.width * scale;
-        const h = img.height * scale;
+      // Calculate dimensions to fit A4 landscape with padding
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageW = 297;
+      const pageH = 210;
+      const pad = 15;
+      const maxW = pageW - pad * 2;
+      const maxH = pageH - pad * 2 - 20; // room for header
 
-        // Header
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(14);
-        pdf.setTextColor(17, 17, 17);
-        pdf.text('DiviData - Prozessmodell (BPMN)', pad, pad + 4);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setFontSize(9);
-        pdf.setTextColor(102, 102, 102);
-        pdf.text(new Date().toLocaleDateString(locale), pageW - pad, pad + 4, { align: 'right' });
+      const ratio = captured.height / captured.width;
+      let w = maxW;
+      let h = w * ratio;
+      if (h > maxH) { h = maxH; w = h / ratio; }
 
-        // Render SVG to canvas then to PDF
-        const c = document.createElement('canvas');
-        const dpr = 3;
-        c.width = img.width * dpr;
-        c.height = img.height * dpr;
-        const ctx = c.getContext('2d')!;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, c.width, c.height);
-        ctx.scale(dpr, dpr);
-        ctx.drawImage(img, 0, 0);
+      // Header
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.setTextColor(17, 17, 17);
+      pdf.text('DiviData - Prozessmodell (BPMN)', pad, pad + 4);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(102, 102, 102);
+      pdf.text(new Date().toLocaleDateString(locale), pageW - pad, pad + 4, { align: 'right' });
 
-        const imgData = c.toDataURL('image/png');
-        const xOff = pad + (maxW - w) / 2;
-        const yOff = pad + 12 + (maxH - h) / 2;
-        pdf.addImage(imgData, 'PNG', xOff, yOff, w, h);
+      const xOff = pad + (maxW - w) / 2;
+      const yOff = pad + 12 + (maxH - h) / 2;
+      pdf.addImage(captured.toDataURL('image/png'), 'PNG', xOff, yOff, w, h);
 
-        // Footer
-        pdf.setFontSize(7);
-        pdf.setTextColor(170, 170, 170);
-        pdf.text('BPMN 2.0 Standard Notation  |  DiviData', pageW / 2, pageH - 8, { align: 'center' });
+      // Footer
+      pdf.setFontSize(7);
+      pdf.setTextColor(170, 170, 170);
+      pdf.text('BPMN 2.0 Standard Notation  |  DiviData', pageW / 2, pageH - 8, { align: 'center' });
 
-        pdf.save('prozessmodell-bpmn.pdf');
-        URL.revokeObjectURL(url);
-      };
-      img.src = url;
+      pdf.save('prozessmodell-bpmn.pdf');
     } catch (err) {
       console.error('BPMN PDF export failed', err);
     }

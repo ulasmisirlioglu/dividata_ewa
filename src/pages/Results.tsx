@@ -7,7 +7,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { Layout } from '../components/Layout';
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, ReferenceLine, ReferenceDot,
+  CartesianGrid, Tooltip, ReferenceLine, ReferenceDot, Legend,
 } from 'recharts';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -62,7 +62,7 @@ export const Results: React.FC = () => {
   const store = useStore();
   const {
     useCase, bpmnXml,
-    stepDurations, setStepDuration, setStepActor, toggleStepActor,
+    stepDurations, setStepDuration, setStepActualBuerger, setStepActor, toggleStepActor,
     digitalSteps, setDigitalStep,
     salaryGroup, setSalaryGroup, hourlyRate, setHourlyRate,
     digitalizationCosts, setDigitalizationCosts,
@@ -322,7 +322,7 @@ export const Results: React.FC = () => {
     // BPMN diagram
     if (bpmnXml) {
       const tempBpmn = document.createElement('div');
-      tempBpmn.style.cssText = 'width:900px;height:400px;position:absolute;left:-9999px;background:#fff';
+      tempBpmn.style.cssText = 'width:900px;height:550px;position:absolute;left:-9999px;background:#fff;overflow:visible';
       document.body.appendChild(tempBpmn);
       const tempViewer = new NavigatedViewer({ container: tempBpmn });
       try {
@@ -330,7 +330,27 @@ export const Results: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const bpmnCanvas = tempViewer.get<any>('canvas');
         bpmnCanvas.zoom('fit-viewport');
-        bpmnCanvas.zoom(bpmnCanvas.zoom() * 0.85);
+        bpmnCanvas.zoom(bpmnCanvas.zoom() * 0.75);
+
+        // Add actor overlays below each task for PDF capture
+        const elReg = tempViewer.get('elementRegistry') as any;
+        const ovService = tempViewer.get('overlays') as any;
+        elReg.filter((el: any) => el.type === 'bpmn:Task').forEach((element: any) => {
+          const step = stepDurations.find(s => s.id === element.id);
+          if (!step) return;
+          const mitA = isMitarbeiter(step.actor);
+          const bueA = isBuerger(step.actor);
+          const c = document.createElement('div');
+          c.style.cssText = `width:${element.width}px;pointer-events:none;margin:0;padding:0;`;
+          const mitLabel = language === 'de' ? 'Mitarbeiter' : 'Employee';
+          const bueLabel = language === 'de' ? 'Bürger' : 'Citizen';
+          c.innerHTML = `<div style="display:flex;width:100%;border:1.5px solid #CBCBCB;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,0.06);">
+            <div style="flex:1;padding:4px 2px;font-size:9px;font-weight:600;letter-spacing:0.055em;text-transform:uppercase;background:${mitA ? '#111' : '#fff'};color:${mitA ? '#fff' : '#888'};border-right:1px solid #E0E0E0;font-family:Inter,system-ui,sans-serif;line-height:1;text-align:center;">${mitLabel}</div>
+            <div style="flex:1;padding:4px 2px;font-size:9px;font-weight:600;letter-spacing:0.055em;text-transform:uppercase;background:${bueA ? '#111' : '#fff'};color:${bueA ? '#fff' : '#888'};font-family:Inter,system-ui,sans-serif;line-height:1;text-align:center;">${bueLabel}</div>
+          </div>`;
+          ovService.add(element.id, { position: { top: element.height, left: 0 }, html: c });
+        });
+
         // Hide bpmn.io watermark
         const badge = tempBpmn.querySelector('.bjs-powered-by');
         if (badge) (badge as HTMLElement).style.display = 'none';
@@ -352,7 +372,8 @@ export const Results: React.FC = () => {
     }
 
     // Pre-calculate analog steps table height to avoid page split
-    const analogTableH = 5 + 5 + stepDurations.length * 4.5 + 21; // label + header + rows + sums
+    const beideCount = stepDurations.filter(s => s.actor === 'Beide').length;
+    const analogTableH = 5 + 5 + (stepDurations.length + beideCount) * 4.5 + 21; // label + header + rows (Beide=2 rows) + sums
     check(analogTableH);
 
     label('1.2', t.resultsAnalogSteps);
@@ -369,20 +390,36 @@ export const Results: React.FC = () => {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     for (const step of stepDurations) {
-      doc.setTextColor(...INK);
-      doc.text(doc.splitTextToSize(step.name, 90)[0], M, y);
-      doc.setTextColor(...GRAY);
-      const actorLabel = step.actor === 'Beide'
-        ? (language === 'de' ? 'Mitarbeiter & Bürger' : 'Employee & Citizen')
-        : step.actor;
-      doc.text(actorLabel, M + 95, y);
-      doc.setTextColor(...INK);
-      doc.text(step.actual.toString(), M + W, y, { align: 'right' });
-      y += 4.5;
+      if (step.actor === 'Beide') {
+        // Mitarbeiter row
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(step.name, 85)[0], M, y);
+        doc.setTextColor(...GRAY);
+        doc.text(language === 'de' ? 'Mitarbeiter' : 'Employee', M + 95, y);
+        doc.setTextColor(...INK);
+        doc.text(step.actual.toString(), M + W, y, { align: 'right' });
+        y += 4.5;
+        // Bürger row
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(step.name, 85)[0], M, y);
+        doc.setTextColor(...GRAY);
+        doc.text(language === 'de' ? 'Bürger' : 'Citizen', M + 95, y);
+        doc.setTextColor(...INK);
+        doc.text(step.actualBuerger.toString(), M + W, y, { align: 'right' });
+        y += 4.5;
+      } else {
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(step.name, 90)[0], M, y);
+        doc.setTextColor(...GRAY);
+        doc.text(step.actor, M + 95, y);
+        doc.setTextColor(...INK);
+        doc.text(step.actual.toString(), M + W, y, { align: 'right' });
+        y += 4.5;
+      }
     }
     // Analog sums
     const analogMitarbeiterMin = stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((a, s) => a + s.actual, 0);
-    const analogBuergerMin = stepDurations.filter(s => isBuerger(s.actor)).reduce((a, s) => a + s.actual, 0);
+    const analogBuergerMin = stepDurations.filter(s => isBuerger(s.actor)).reduce((a, s) => a + (s.actor === 'Beide' ? s.actualBuerger : s.actual), 0);
     y += 1;
     doc.setDrawColor(...LINE);
     doc.line(M + W - 30, y, M + W, y);
@@ -419,7 +456,8 @@ export const Results: React.FC = () => {
     y += 6;
 
     // Pre-calculate digital steps table height to avoid page split
-    const digitalTableH = 9 + 5 + digitalSteps.length * 4.5 + 21; // heading + header + rows + sums
+    const digitalBeideCount = digitalSteps.filter(d => stepDurations.find(s => s.id === d.id)?.actor === 'Beide').length;
+    const digitalTableH = 9 + 5 + (digitalSteps.length + digitalBeideCount) * 4.5 + 21; // heading + header + rows (Beide=2) + sums
     check(digitalTableH);
 
     label('1.4', t.resultsDigitalSteps);
@@ -435,17 +473,37 @@ export const Results: React.FC = () => {
     y += 4;
     doc.setFont('helvetica', 'normal');
     for (const ds of digitalSteps) {
-      doc.setTextColor(...INK);
-      doc.text(doc.splitTextToSize(ds.name, 75)[0], M, y);
-      doc.setTextColor(...GRAY);
-      doc.text(doc.splitTextToSize(ds.digitalReplacement || '—', 75)[0], M + 80, y);
-      doc.setTextColor(...INK);
-      doc.text(ds.digitalDuration.toString(), M + W, y, { align: 'right' });
-      y += 4.5;
+      const stepActor = stepDurations.find(s => s.id === ds.id)?.actor;
+      if (stepActor === 'Beide') {
+        // Mitarbeiter row
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(ds.name + ` (${language === 'de' ? 'MA' : 'Emp'})`, 75)[0], M, y);
+        doc.setTextColor(...GRAY);
+        doc.text(doc.splitTextToSize(ds.digitalReplacement || '—', 75)[0], M + 80, y);
+        doc.setTextColor(...INK);
+        doc.text(ds.digitalDuration.toString(), M + W, y, { align: 'right' });
+        y += 4.5;
+        // Bürger row
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(ds.name + ` (${language === 'de' ? 'BÜ' : 'Cit'})`, 75)[0], M, y);
+        doc.setTextColor(...GRAY);
+        doc.text(doc.splitTextToSize(ds.digitalReplacementBuerger || '—', 75)[0], M + 80, y);
+        doc.setTextColor(...INK);
+        doc.text(ds.digitalDurationBuerger.toString(), M + W, y, { align: 'right' });
+        y += 4.5;
+      } else {
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(ds.name, 75)[0], M, y);
+        doc.setTextColor(...GRAY);
+        doc.text(doc.splitTextToSize(ds.digitalReplacement || '—', 75)[0], M + 80, y);
+        doc.setTextColor(...INK);
+        doc.text(ds.digitalDuration.toString(), M + W, y, { align: 'right' });
+        y += 4.5;
+      }
     }
     // Digital sums
     const digitalMitarbeiterMin = digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isMitarbeiter(a); }).reduce((a, d) => a + d.digitalDuration, 0);
-    const digitalBuergerMin = digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isBuerger(a); }).reduce((a, d) => a + d.digitalDuration, 0);
+    const digitalBuergerMin = digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isBuerger(a); }).reduce((a, d) => { const actor = stepDurations.find(s => s.id === d.id)?.actor; return a + (actor === 'Beide' ? d.digitalDurationBuerger : d.digitalDuration); }, 0);
     y += 1;
     doc.setDrawColor(...LINE);
     doc.line(M + W - 30, y, M + W, y);
@@ -667,30 +725,45 @@ export const Results: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hb-line">
-                  {stepDurations.map(step => (
-                    <tr key={step.id} className="hover:bg-hb-paper transition-colors">
-                      <td className="hb-table-cell px-4 font-medium text-sm">{step.name}</td>
-                      <td className="hb-table-cell px-4">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            onClick={() => toggleStepActor(step.id, 'Mitarbeiter')}
-                            className={clsx('px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
-                              isMitarbeiter(step.actor) ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
-                          >{t.employeeLabel}</button>
-                          <button
-                            onClick={() => toggleStepActor(step.id, 'Bürger')}
-                            className={clsx('px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
-                              isBuerger(step.actor) ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
-                          >{t.citizenLabel}</button>
-                        </div>
-                      </td>
-                      <td className="hb-table-cell px-4 text-right">
-                        <input type="number" min="0" value={step.actual || ''}
-                          onChange={e => setStepDuration(step.id, parseFloat(e.target.value) || 0)}
-                          className="bg-transparent border-b border-hb-line w-20 text-right focus:border-hb-ink focus:outline-none py-1 transition-colors" />
-                      </td>
-                    </tr>
-                  ))}
+                  {stepDurations.flatMap(step => {
+                    const renderRow = (rowActor: 'Mitarbeiter' | 'Bürger') => {
+                      const isMitRow = rowActor === 'Mitarbeiter';
+                      const isBothActors = step.actor === 'Beide';
+                      const duration = (isBothActors && !isMitRow) ? step.actualBuerger : step.actual;
+                      const handleDuration = (v: number) =>
+                        (isBothActors && !isMitRow) ? setStepActualBuerger(step.id, v) : setStepDuration(step.id, v);
+                      return (
+                        <tr key={`${step.id}_${rowActor}`} className="hover:bg-hb-paper transition-colors">
+                          <td className="hb-table-cell px-4 font-medium text-sm">
+                            {step.name}
+                            {isBothActors && <span className="ml-2 text-xs text-hb-gray font-normal">({rowActor === 'Mitarbeiter' ? t.employeeLabel : t.citizenLabel})</span>}
+                          </td>
+                          <td className="hb-table-cell px-4">
+                            <div className="flex justify-center gap-1">
+                              <button
+                                onClick={() => toggleStepActor(step.id, 'Mitarbeiter')}
+                                className={clsx('px-3 py-1 text-xs rounded-l border border-hb-line transition-colors',
+                                  isMitRow ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
+                              >{t.employeeLabel}</button>
+                              <button
+                                onClick={() => toggleStepActor(step.id, 'Bürger')}
+                                className={clsx('px-3 py-1 text-xs rounded-r border border-hb-line transition-colors',
+                                  !isMitRow ? 'bg-hb-ink text-white border-hb-ink' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
+                              >{t.citizenLabel}</button>
+                            </div>
+                          </td>
+                          <td className="hb-table-cell px-4 text-right">
+                            <input type="number" min="0" value={duration || ''}
+                              onChange={e => handleDuration(parseFloat(e.target.value) || 0)}
+                              className="bg-transparent border-b border-hb-line w-20 text-right focus:border-hb-ink focus:outline-none py-1 transition-colors" />
+                          </td>
+                        </tr>
+                      );
+                    };
+                    return step.actor === 'Beide'
+                      ? [renderRow('Mitarbeiter'), renderRow('Bürger')]
+                      : [renderRow(step.actor === 'Bürger' ? 'Bürger' : 'Mitarbeiter')];
+                  })}
                 </tbody>
               </table>
             </div>
@@ -733,23 +806,65 @@ export const Results: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hb-line">
-                  {digitalSteps.map(step => (
-                    <tr key={step.id} className="hover:bg-hb-paper transition-colors">
-                      <td className="hb-table-cell px-4 font-medium text-sm">{step.name}</td>
-                      <td className="hb-table-cell px-4 text-center text-xs text-hb-gray">{getActor(step.id)}</td>
-                      <td className="hb-table-cell px-4 text-right text-hb-gray">{getAnalogDur(step.id)} min</td>
-                      <td className="hb-table-cell px-4">
-                        <input type="text" value={step.digitalReplacement}
-                          onChange={e => setDigitalStep(step.id, { digitalReplacement: e.target.value })}
-                          className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all text-sm" />
-                      </td>
-                      <td className="hb-table-cell px-4 text-right">
-                        <input type="number" min="0" value={step.digitalDuration}
-                          onChange={e => setDigitalStep(step.id, { digitalDuration: parseFloat(e.target.value) || 0 })}
-                          className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors" />
-                      </td>
-                    </tr>
-                  ))}
+                  {digitalSteps.flatMap(step => {
+                    const actor = getActorRaw(step.id);
+                    const analogStep = stepDurations.find(s => s.id === step.id);
+                    if (actor === 'Beide') {
+                      return [
+                        <tr key={`${step.id}_MA`} className="hover:bg-hb-paper transition-colors">
+                          <td className="hb-table-cell px-4 font-medium text-sm">
+                            {step.name} <span className="text-xs text-hb-gray font-normal">({t.employeeLabel})</span>
+                          </td>
+                          <td className="hb-table-cell px-4 text-center text-xs text-hb-gray">{t.employeeLabel}</td>
+                          <td className="hb-table-cell px-4 text-right text-hb-gray">{analogStep?.actual ?? 0} min</td>
+                          <td className="hb-table-cell px-4">
+                            <input type="text" value={step.digitalReplacement}
+                              onChange={e => setDigitalStep(step.id, { digitalReplacement: e.target.value })}
+                              className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all text-sm" />
+                          </td>
+                          <td className="hb-table-cell px-4 text-right">
+                            <input type="number" min="0" value={step.digitalDuration || ''}
+                              onChange={e => setDigitalStep(step.id, { digitalDuration: parseFloat(e.target.value) || 0 })}
+                              className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors" />
+                          </td>
+                        </tr>,
+                        <tr key={`${step.id}_BU`} className="hover:bg-hb-paper transition-colors">
+                          <td className="hb-table-cell px-4 font-medium text-sm">
+                            {step.name} <span className="text-xs text-hb-gray font-normal">({t.citizenLabel})</span>
+                          </td>
+                          <td className="hb-table-cell px-4 text-center text-xs text-hb-gray">{t.citizenLabel}</td>
+                          <td className="hb-table-cell px-4 text-right text-hb-gray">{analogStep?.actualBuerger ?? 0} min</td>
+                          <td className="hb-table-cell px-4">
+                            <input type="text" value={step.digitalReplacementBuerger}
+                              onChange={e => setDigitalStep(step.id, { digitalReplacementBuerger: e.target.value })}
+                              className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all text-sm" />
+                          </td>
+                          <td className="hb-table-cell px-4 text-right">
+                            <input type="number" min="0" value={step.digitalDurationBuerger || ''}
+                              onChange={e => setDigitalStep(step.id, { digitalDurationBuerger: parseFloat(e.target.value) || 0 })}
+                              className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors" />
+                          </td>
+                        </tr>,
+                      ];
+                    }
+                    return [
+                      <tr key={step.id} className="hover:bg-hb-paper transition-colors">
+                        <td className="hb-table-cell px-4 font-medium text-sm">{step.name}</td>
+                        <td className="hb-table-cell px-4 text-center text-xs text-hb-gray">{getActor(step.id)}</td>
+                        <td className="hb-table-cell px-4 text-right text-hb-gray">{analogStep?.actual ?? 0} min</td>
+                        <td className="hb-table-cell px-4">
+                          <input type="text" value={step.digitalReplacement}
+                            onChange={e => setDigitalStep(step.id, { digitalReplacement: e.target.value })}
+                            className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all text-sm" />
+                        </td>
+                        <td className="hb-table-cell px-4 text-right">
+                          <input type="number" min="0" value={step.digitalDuration || ''}
+                            onChange={e => setDigitalStep(step.id, { digitalDuration: parseFloat(e.target.value) || 0 })}
+                            className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors" />
+                        </td>
+                      </tr>,
+                    ];
+                  })}
                 </tbody>
               </table>
             </div>
@@ -898,7 +1013,7 @@ export const Results: React.FC = () => {
                 <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.buergerMinSaved}</h4>
                 <p className="text-3xl font-display text-hb-ink">{perCase.buergerMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
                 <p className="text-xs text-hb-gray/60 mt-1 font-mono">
-                  {stepDurations.filter(s => isBuerger(s.actor)).reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isBuerger(a); }).reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                  {stepDurations.filter(s => isBuerger(s.actor)).reduce((a, s) => a + (s.actor === 'Beide' ? s.actualBuerger : s.actual), 0)} min (analog) &rarr; {digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isBuerger(a); }).reduce((a, d) => { const actor = stepDurations.find(s => s.id === d.id)?.actor; return a + (actor === 'Beide' ? d.digitalDurationBuerger : d.digitalDuration); }, 0)} min (digital)
                 </p>
               </div>
             </div>
@@ -1002,8 +1117,15 @@ export const Results: React.FC = () => {
                     <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
                       label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
                     <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
-                    <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" />
-                    <Bar dataKey={t.monthlyBuergerH} fill="#999999" />
+                    <Legend
+                      verticalAlign="top"
+                      align="right"
+                      iconType="square"
+                      wrapperStyle={{ fontSize: 12, fontWeight: 300 }}
+                      formatter={(value: string) => value === t.monthlyMitarbeiterH ? 'Mitarbeiter' : 'Bürger'}
+                    />
+                    <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" name={t.monthlyMitarbeiterH} />
+                    <Bar dataKey={t.monthlyBuergerH} fill="#999999" name={t.monthlyBuergerH} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

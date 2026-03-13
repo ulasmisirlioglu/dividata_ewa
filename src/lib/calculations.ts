@@ -28,9 +28,14 @@ export function calculatePerCaseSavings(
   for (const step of stepDurations) {
     const ds = digitalSteps.find(d => d.id === step.id);
     if (!ds) continue;
-    const saved = step.actual - ds.digitalDuration;
-    if (isMitarbeiter(step.actor)) mitarbeiterSaved += saved;
-    if (isBuerger(step.actor)) buergerSaved += saved;
+    if (isMitarbeiter(step.actor)) {
+      mitarbeiterSaved += step.actual - ds.digitalDuration;
+    }
+    if (isBuerger(step.actor)) {
+      const analogBuerger = step.actor === 'Beide' ? step.actualBuerger : step.actual;
+      const digitalBuerger = step.actor === 'Beide' ? ds.digitalDurationBuerger : ds.digitalDuration;
+      buergerSaved += analogBuerger - digitalBuerger;
+    }
   }
 
   return {
@@ -136,7 +141,7 @@ export function computeProjectDerivedValues(state: {
     .reduce((acc, s) => acc + s.actual, 0);
   const analogBuergerMin = stepDurations
     .filter(s => isBuerger(s.actor))
-    .reduce((acc, s) => acc + s.actual, 0);
+    .reduce((acc, s) => acc + (s.actor === 'Beide' ? s.actualBuerger : s.actual), 0);
   const analogCostPerProcess = (analogMitarbeiterMin / 60) * hourlyRate;
 
   // Digital minutes (weighted by digitalization percent)
@@ -149,7 +154,7 @@ export function computeProjectDerivedValues(state: {
       digitalMitarbeiterMin += ds.digitalDuration;
     }
     if (isBuerger(step.actor)) {
-      digitalBuergerMin += ds.digitalDuration;
+      digitalBuergerMin += step.actor === 'Beide' ? ds.digitalDurationBuerger : ds.digitalDuration;
     }
   }
   const digitalPersonnelCost = (digitalMitarbeiterMin / 60) * hourlyRate;

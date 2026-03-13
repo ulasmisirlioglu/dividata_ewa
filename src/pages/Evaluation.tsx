@@ -35,11 +35,6 @@ export const Evaluation: React.FC = () => {
     }
   };
 
-  const getAnalogDuration = (id: string) => {
-    const step = stepDurations.find(s => s.id === id);
-    return step ? step.actual : 0;
-  };
-
   const getActorRaw = (id: string) => {
     const step = stepDurations.find(s => s.id === id);
     return step ? step.actor : null;
@@ -55,6 +50,7 @@ export const Evaluation: React.FC = () => {
   const digitalMitarbeiterMin = digitalSteps.reduce((acc, s) => {
     const step = stepDurations.find(sd => sd.id === s.id);
     if (!step || !isMitarbeiter(step.actor)) return acc;
+    // For Beide: Mitarbeiter row uses digitalDuration, Bürger row uses digitalDurationBuerger
     return acc + s.digitalDuration;
   }, 0);
   const digitalPersonnelCostPerProcess = (digitalMitarbeiterMin / 60) * hourlyRate;
@@ -140,9 +136,77 @@ export const Evaluation: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-hb-line">
-                    {filteredDigital.map((step) => {
-                      const analogTime = getAnalogDuration(step.id);
-                      return (
+                    {filteredDigital.flatMap((step) => {
+                      const actor = getActorRaw(step.id);
+                      const analogStep = filteredAnalog.find(s => s.id === step.id);
+                      if (actor === 'Beide') {
+                        return [
+                          // Mitarbeiter row
+                          <tr key={`${step.id}_MA`} className="hover:bg-hb-paper transition-colors">
+                            <td className="hb-table-cell px-6 font-medium">
+                              {step.name}
+                              <span className="ml-2 text-xs text-hb-gray font-normal">({t.employeeLabel})</span>
+                            </td>
+                            <td className="hb-table-cell px-6 text-center">
+                              <span className="text-xs text-hb-gray">{t.employeeLabel}</span>
+                            </td>
+                            <td className="hb-table-cell px-6 text-right text-hb-gray">
+                              {analogStep?.actual ?? 0} min
+                            </td>
+                            <td className="hb-table-cell px-6 text-hb-gray">
+                              <input
+                                type="text"
+                                value={step.digitalReplacement}
+                                onChange={(e) => setDigitalStep(step.id, { digitalReplacement: e.target.value })}
+                                className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all"
+                              />
+                            </td>
+                            <td className="hb-table-cell px-6 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={step.digitalDuration || ''}
+                                onChange={(e) => setDigitalStep(step.id, { digitalDuration: parseFloat(e.target.value) || 0 })}
+                                placeholder="—"
+                                className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors placeholder:text-hb-gray/40"
+                              />
+                            </td>
+                          </tr>,
+                          // Bürger row
+                          <tr key={`${step.id}_BU`} className="hover:bg-hb-paper transition-colors">
+                            <td className="hb-table-cell px-6 font-medium">
+                              {step.name}
+                              <span className="ml-2 text-xs text-hb-gray font-normal">({t.citizenLabel})</span>
+                            </td>
+                            <td className="hb-table-cell px-6 text-center">
+                              <span className="text-xs text-hb-gray">{t.citizenLabel}</span>
+                            </td>
+                            <td className="hb-table-cell px-6 text-right text-hb-gray">
+                              {analogStep?.actualBuerger ?? 0} min
+                            </td>
+                            <td className="hb-table-cell px-6 text-hb-gray">
+                              <input
+                                type="text"
+                                value={step.digitalReplacementBuerger}
+                                onChange={(e) => setDigitalStep(step.id, { digitalReplacementBuerger: e.target.value })}
+                                className="bg-transparent border-b border-transparent hover:border-hb-line focus:border-hb-ink focus:outline-none w-full py-1 transition-all"
+                              />
+                            </td>
+                            <td className="hb-table-cell px-6 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                value={step.digitalDurationBuerger || ''}
+                                onChange={(e) => setDigitalStep(step.id, { digitalDurationBuerger: parseFloat(e.target.value) || 0 })}
+                                placeholder="—"
+                                className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors placeholder:text-hb-gray/40"
+                              />
+                            </td>
+                          </tr>,
+                        ];
+                      }
+                      // Single row
+                      return [
                         <tr key={step.id} className="hover:bg-hb-paper transition-colors">
                           <td className="hb-table-cell px-6 font-medium">
                             {step.name}
@@ -151,7 +215,7 @@ export const Evaluation: React.FC = () => {
                             <span className="text-xs text-hb-gray">{getActor(step.id)}</span>
                           </td>
                           <td className="hb-table-cell px-6 text-right text-hb-gray">
-                            {analogTime} min
+                            {analogStep?.actual ?? 0} min
                           </td>
                           <td className="hb-table-cell px-6 text-hb-gray">
                             <input
@@ -171,8 +235,8 @@ export const Evaluation: React.FC = () => {
                               className="w-12 bg-transparent border-b border-hb-line text-right focus:border-hb-ink focus:outline-none py-1 transition-colors placeholder:text-hb-gray/40"
                             />
                           </td>
-                        </tr>
-                      );
+                        </tr>,
+                      ];
                     })}
                   </tbody>
                   <tfoot>
@@ -185,12 +249,25 @@ export const Evaluation: React.FC = () => {
                     </tr>
                     <tr className="bg-hb-paper border-t border-hb-line/50">
                       <td className="hb-table-cell px-6 text-right text-hb-ink whitespace-nowrap">
-                        {filteredAnalog.filter(s => isMitarbeiter(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.employeeMin}<br/>
-                        + {filteredAnalog.filter(s => isBuerger(s.actor)).reduce((acc, s) => acc + s.actual, 0)} {t.citizenMin}
+                        {filteredAnalog.reduce((acc, s) => isMitarbeiter(s.actor) ? acc + s.actual : acc, 0)} {t.employeeMin}<br/>
+                        + {filteredAnalog.reduce((acc, s) => {
+                          if (s.actor === 'Bürger') return acc + s.actual;
+                          if (s.actor === 'Beide') return acc + s.actualBuerger;
+                          return acc;
+                        }, 0)} {t.citizenMin}
                       </td>
                       <td className="hb-table-cell px-6 text-right text-hb-ink font-medium whitespace-nowrap">
-                        {filteredDigital.filter(s => { const a = getActorRaw(s.id); return a && isMitarbeiter(a); }).reduce((acc, s) => acc + s.digitalDuration, 0)} {t.employeeMin}<br/>
-                        + {filteredDigital.filter(s => { const a = getActorRaw(s.id); return a && isBuerger(a); }).reduce((acc, s) => acc + s.digitalDuration, 0)} {t.citizenMin}
+                        {filteredDigital.reduce((acc, s) => {
+                          const a = getActorRaw(s.id);
+                          return (a && isMitarbeiter(a)) ? acc + s.digitalDuration : acc;
+                        }, 0)} {t.employeeMin}<br/>
+                        + {filteredDigital.reduce((acc, s) => {
+                          const a = getActorRaw(s.id);
+                          if (!a) return acc;
+                          if (a === 'Bürger') return acc + s.digitalDuration;
+                          if (a === 'Beide') return acc + s.digitalDurationBuerger;
+                          return acc;
+                        }, 0)} {t.citizenMin}
                       </td>
                     </tr>
                   </tfoot>

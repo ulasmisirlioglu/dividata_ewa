@@ -14,6 +14,14 @@ export function isBuerger(actor: StepActor): boolean {
   return actor === 'Bürger' || actor === 'Beide';
 }
 
+/** Infer default actor from task name when no lane information is available */
+function inferActorFromName(name: string): StepActor {
+  if (/formular|warten|ziehen|entgegennehmen|überreichen|ausfüllen|anreise|rückreise|reise/i.test(name)) {
+    return 'Bürger';
+  }
+  return 'Mitarbeiter';
+}
+
 /** Parse BPMN XML → valid process tasks vs abort-path tasks, sorted by sequence flow order */
 export function parseBpmnXml(xml: string) {
   const allTasks: { id: string; name: string }[] = [];
@@ -133,6 +141,7 @@ export interface StepDuration {
   id: string;
   name: string;
   actual: number;
+  actualBuerger: number;
   actor: StepActor;
 }
 
@@ -142,6 +151,9 @@ export interface DigitalStep {
   digitalReplacement: string;
   digitalizationPercent: number; // 0-100
   digitalDuration: number; // minutes
+  // Bürger variants — only meaningful when corresponding StepDuration.actor === 'Beide'
+  digitalReplacementBuerger: string;
+  digitalDurationBuerger: number;
 }
 
 export interface ProcessInterval {
@@ -189,6 +201,7 @@ export interface StoreState {
   setUseCase: (useCase: string) => void;
   setBpmnXml: (xml: string) => void;
   setStepDuration: (id: string, duration: number) => void;
+  setStepActualBuerger: (id: string, duration: number) => void;
   setStepActor: (id: string, actor: StepActor) => void;
   toggleStepActor: (id: string, clickedActor: 'Mitarbeiter' | 'Bürger') => void;
   setSalaryGroup: (group: string) => void;
@@ -204,25 +217,29 @@ export interface StoreState {
 }
 
 const defaultStepDurations: StepDuration[] = [
-  { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', actual: 0, actor: 'Bürger' },
-  { id: 'Task_2', name: 'Wartenummer ziehen', actual: 0, actor: 'Bürger' },
-  { id: 'Task_3', name: 'Warten bis Aufruf', actual: 0, actor: 'Bürger' },
-  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_6', name: 'Bescheinigung drucken', actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_7', name: 'Gebühren kassieren', actual: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', actual: 0, actor: 'Bürger' },
+  { id: 'Task_Anreise', name: 'Anreise zum Amt', actual: 0, actualBuerger: 0, actor: 'Bürger' },
+  { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', actual: 0, actualBuerger: 0, actor: 'Bürger' },
+  { id: 'Task_2', name: 'Wartenummer ziehen', actual: 0, actualBuerger: 0, actor: 'Bürger' },
+  { id: 'Task_3', name: 'Warten bis Aufruf', actual: 0, actualBuerger: 0, actor: 'Bürger' },
+  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_6', name: 'Bescheinigung drucken', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_7', name: 'Gebühren kassieren', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
+  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', actual: 0, actualBuerger: 0, actor: 'Bürger' },
+  { id: 'Task_Rueckreise', name: 'Rückreise vom Amt', actual: 0, actualBuerger: 0, actor: 'Bürger' },
 ];
 
 const defaultDigitalSteps: DigitalStep[] = [
-  { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', digitalReplacement: 'Online-Formular (eWA)', digitalizationPercent: 90, digitalDuration: 0 },
-  { id: 'Task_2', name: 'Wartenummer ziehen', digitalReplacement: 'Entfällt (Online Antrag)', digitalizationPercent: 100, digitalDuration: 0 },
-  { id: 'Task_3', name: 'Warten bis Aufruf', digitalReplacement: 'Entfällt', digitalizationPercent: 100, digitalDuration: 0 },
-  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', digitalReplacement: 'eID (Online Ausweis)', digitalizationPercent: 80, digitalDuration: 0 },
-  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', digitalReplacement: 'Automatische Datenübernahme', digitalizationPercent: 90, digitalDuration: 0 },
-  { id: 'Task_6', name: 'Bescheinigung drucken', digitalReplacement: 'Digitaler Versand', digitalizationPercent: 100, digitalDuration: 0 },
-  { id: 'Task_7', name: 'Gebühren kassieren', digitalReplacement: 'E-Payment', digitalizationPercent: 100, digitalDuration: 0 },
-  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', digitalReplacement: 'Digitaler Download / E-Mail', digitalizationPercent: 100, digitalDuration: 0 },
+  { id: 'Task_Anreise', name: 'Anreise zum Amt', digitalReplacement: 'Entfällt (Online-Prozess)', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', digitalReplacement: 'Online-Formular (eWA)', digitalizationPercent: 90, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_2', name: 'Wartenummer ziehen', digitalReplacement: 'Entfällt (Online Antrag)', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_3', name: 'Warten bis Aufruf', digitalReplacement: 'Entfällt', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', digitalReplacement: 'eID (Online Ausweis)', digitalizationPercent: 80, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', digitalReplacement: 'Automatische Datenübernahme', digitalizationPercent: 90, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_6', name: 'Bescheinigung drucken', digitalReplacement: 'Digitaler Versand', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_7', name: 'Gebühren kassieren', digitalReplacement: 'E-Payment', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', digitalReplacement: 'Digitaler Download / E-Mail', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
+  { id: 'Task_Rueckreise', name: 'Rückreise vom Amt', digitalReplacement: 'Entfällt (Online-Prozess)', digitalizationPercent: 100, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 },
 ];
 
 const getCurrentMonth = () => {
@@ -292,7 +309,7 @@ export const useStore = create<StoreState>((set) => ({
       });
     for (const task of validTasks) {
       if (!existingStepIds.has(task.id)) {
-        updatedSteps.push({ id: task.id, name: task.name, actual: 0, actor: laneActorMap.get(task.id) ?? 'Mitarbeiter' as StepActor });
+        updatedSteps.push({ id: task.id, name: task.name, actual: 0, actualBuerger: 0, actor: laneActorMap.get(task.id) ?? inferActorFromName(task.name) });
       }
     }
     // Sort to match BPMN XML order
@@ -308,7 +325,7 @@ export const useStore = create<StoreState>((set) => ({
       });
     for (const task of validTasks) {
       if (!existingDigitalIds.has(task.id)) {
-        updatedDigital.push({ id: task.id, name: task.name, digitalReplacement: '', digitalizationPercent: 0, digitalDuration: 0 });
+        updatedDigital.push({ id: task.id, name: task.name, digitalReplacement: '', digitalizationPercent: 0, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 });
       }
     }
     // Sort to match BPMN XML order
@@ -322,6 +339,9 @@ export const useStore = create<StoreState>((set) => ({
   }),
   setStepDuration: (id, duration) => set((state) => ({
     stepDurations: state.stepDurations.map((s) => s.id === id ? { ...s, actual: duration } : s)
+  })),
+  setStepActualBuerger: (id, duration) => set((state) => ({
+    stepDurations: state.stepDurations.map((s) => s.id === id ? { ...s, actualBuerger: duration } : s)
   })),
   setStepActor: (id, actor) => set((state) => ({
     stepDurations: state.stepDurations.map((s) => s.id === id ? { ...s, actor } : s)
@@ -381,28 +401,58 @@ export const useStore = create<StoreState>((set) => ({
   })),
 
   loadProject: (data) => {
+    const bpmnXml = data.bpmn_xml ?? initialBpmnXml;
+    const { validTasks, laneActorMap } = parseBpmnXml(bpmnXml);
+    const validIds = new Set(validTasks.map(t => t.id));
+    const orderIndex = new Map(validTasks.map((t, i) => [t.id, i]));
+
+    // Migrate saved steps and add any tasks present in BPMN but missing from saved data
+    const savedSteps: StepDuration[] = ((data.step_durations as StepDuration[]) ?? defaultStepDurations)
+      .map(s => ({ actualBuerger: 0, ...s }));
+    const savedStepIds = new Set(savedSteps.map(s => s.id));
+    const syncedSteps = savedSteps.filter(s => validIds.has(s.id));
+    for (const task of validTasks) {
+      if (!savedStepIds.has(task.id)) {
+        syncedSteps.push({ id: task.id, name: task.name, actual: 0, actualBuerger: 0, actor: laneActorMap.get(task.id) ?? inferActorFromName(task.name) });
+      }
+    }
+    syncedSteps.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
+
+    // Migrate saved digital steps and add missing ones
+    const savedDigital: DigitalStep[] = ((data.digital_steps as DigitalStep[]) ?? defaultDigitalSteps)
+      .map(s => ({ digitalReplacementBuerger: '', digitalDurationBuerger: 0, ...s }));
+    const savedDigitalIds = new Set(savedDigital.map(s => s.id));
+    const syncedDigital = savedDigital.filter(s => validIds.has(s.id));
+    for (const task of validTasks) {
+      if (!savedDigitalIds.has(task.id)) {
+        const def = defaultDigitalSteps.find(d => d.id === task.id);
+        syncedDigital.push(def ?? { id: task.id, name: task.name, digitalReplacement: '', digitalizationPercent: 0, digitalDuration: 0, digitalReplacementBuerger: '', digitalDurationBuerger: 0 });
+      }
+    }
+    syncedDigital.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0));
+
     localStorage.setItem('dividata_project_id', data.id);
     return set({
-    currentProjectId: data.id,
-    projectName: data.project_name,
-    municipalityName: data.stadtname,
-    useCase: data.use_case,
-    bpmnXml: data.bpmn_xml ?? initialBpmnXml,
-    stepDurations: (data.step_durations as StepDuration[]) ?? defaultStepDurations,
-    salaryGroup: data.salary_group ?? '',
-    hourlyRate: data.hourly_rate ?? 0,
-    monthlyVolume: 500,
-    digitalSteps: (data.digital_steps as DigitalStep[]) ?? defaultDigitalSteps,
-    digitalizationCosts: {
-      licenseCostYear: data.license_cost_year ?? 0,
-      maintenanceCostYear: data.maintenance_cost_year ?? 0,
-      otherCostYear: data.other_cost_year ?? 0,
-      implementationCost: data.implementation_cost ?? 0,
-      trainingCost: data.training_cost ?? 0,
-    },
-    processIntervals: (data.process_intervals as ProcessInterval[]) ?? defaultProcessIntervals,
-    saveStatus: 'saved',
-  });
+      currentProjectId: data.id,
+      projectName: data.project_name,
+      municipalityName: data.stadtname,
+      useCase: data.use_case,
+      bpmnXml,
+      stepDurations: syncedSteps,
+      salaryGroup: data.salary_group ?? '',
+      hourlyRate: data.hourly_rate ?? 0,
+      monthlyVolume: 500,
+      digitalSteps: syncedDigital,
+      digitalizationCosts: {
+        licenseCostYear: data.license_cost_year ?? 0,
+        maintenanceCostYear: data.maintenance_cost_year ?? 0,
+        otherCostYear: data.other_cost_year ?? 0,
+        implementationCost: data.implementation_cost ?? 0,
+        trainingCost: data.training_cost ?? 0,
+      },
+      processIntervals: (data.process_intervals as ProcessInterval[]) ?? defaultProcessIntervals,
+      saveStatus: 'saved',
+    });
   },
 
   reset: () => {
