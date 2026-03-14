@@ -33,6 +33,8 @@ function formatMonthLabel(yyyyMm: string, lang: 'de' | 'en'): string {
   return d.toLocaleDateString(lang === 'de' ? 'de-DE' : 'en-US', { month: 'short', year: 'numeric' });
 }
 
+const BUERGER_HOURLY_RATE = 23.15;
+
 /* ─── CollapsibleSection ─── */
 
 const CollapsibleSection: React.FC<{
@@ -94,14 +96,29 @@ export const Results: React.FC = () => {
       const canvas = viewer.get('canvas');
       canvas.zoom('fit-viewport');
       canvas.zoom(canvas.zoom() * 0.85);
+
+      // Add actor text labels below each task
+      const elReg = viewer.get('elementRegistry') as any;
+      const ovService = viewer.get('overlays') as any;
+      elReg.filter((el: any) => el.type === 'bpmn:Task').forEach((element: any) => {
+        const step = stepDurations.find(s => s.id === element.id);
+        if (!step) return;
+        const actorLabel = step.actor === 'Beide' ? (language === 'de' ? 'MA & BÜ' : 'Emp. & Cit.') : step.actor;
+        const c = document.createElement('div');
+        c.style.cssText = `width:${element.width}px;text-align:right;padding:1px 4px 0 0;pointer-events:none;`;
+        c.innerHTML = `<span style="font-size:8px;font-family:Inter,sans-serif;color:#111;font-weight:500;">${actorLabel}</span>`;
+        ovService.add(element.id, { position: { top: element.height + 2, left: 0 }, html: c });
+      });
     });
 
     return () => { viewer.destroy(); };
-  }, [openSections.bpmn, bpmnXml]);
+  }, [openSections.bpmn, bpmnXml, stepDurations, language]);
 
   // Chart line visibility
   const [showMitarbeiter, setShowMitarbeiter] = useState(true);
   const [showBuerger, setShowBuerger] = useState(true);
+  // Sicht toggle: Kommun = Mitarbeitersicht, Bürger = Bürgersicht
+  const [sicht, setSicht] = useState<'Kommun' | 'Bürger'>('Kommun');
 
   // Derived values
   const perCase = useMemo(
@@ -136,6 +153,19 @@ export const Results: React.FC = () => {
     month: formatMonthLabel(p.month, language),
     [t.cumulativeNetSavings]: Math.round(p.cumEur * 100) / 100,
   })), [timeSeries, language, t]);
+
+  const buergerMonthlyEurData = useMemo(() => timeSeries.map(p => ({
+    month: formatMonthLabel(p.month, language),
+    [t.buergerEurSavLabel]: Math.round(p.buergerH * BUERGER_HOURLY_RATE * 100) / 100,
+  })), [timeSeries, language, t]);
+
+  const buergerCumEurData = useMemo(() => {
+    let cum = 0;
+    return timeSeries.map((p, i) => {
+      cum += p.buergerH * BUERGER_HOURLY_RATE;
+      return { idx: i, month: formatMonthLabel(p.month, language), [t.buergerCumEurLabel]: Math.round(cum * 100) / 100 };
+    });
+  }, [timeSeries, language, t]);
 
   const breakEvenPoint = useMemo(() => {
     const crossIdx = timeSeries.findIndex((p, i) => i > 0 && timeSeries[i - 1].cumEur < 0 && p.cumEur >= 0);
@@ -319,54 +349,53 @@ export const Results: React.FC = () => {
     // ─── INPUTS ───
     heading('1.', t.pdfInputParams);
 
-    // BPMN diagram
+    // BPMN diagram inline – use saveSVG to get exact diagram bounds
     if (bpmnXml) {
       const tempBpmn = document.createElement('div');
-      tempBpmn.style.cssText = 'width:900px;height:550px;position:absolute;left:-9999px;background:#fff;overflow:visible';
+      tempBpmn.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px;overflow:hidden';
       document.body.appendChild(tempBpmn);
       const tempViewer = new NavigatedViewer({ container: tempBpmn });
       try {
         await tempViewer.importXML(bpmnXml);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const bpmnCanvas = tempViewer.get<any>('canvas');
-        bpmnCanvas.zoom('fit-viewport');
-        bpmnCanvas.zoom(bpmnCanvas.zoom() * 0.75);
-
-        // Add actor overlays below each task for PDF capture
-        const elReg = tempViewer.get('elementRegistry') as any;
-        const ovService = tempViewer.get('overlays') as any;
-        elReg.filter((el: any) => el.type === 'bpmn:Task').forEach((element: any) => {
-          const step = stepDurations.find(s => s.id === element.id);
-          if (!step) return;
-          const mitA = isMitarbeiter(step.actor);
-          const bueA = isBuerger(step.actor);
-          const c = document.createElement('div');
-          c.style.cssText = `width:${element.width}px;pointer-events:none;margin:0;padding:0;`;
-          const mitLabel = language === 'de' ? 'Mitarbeiter' : 'Employee';
-          const bueLabel = language === 'de' ? 'Bürger' : 'Citizen';
-          c.innerHTML = `<div style="display:flex;width:100%;border:1.5px solid #CBCBCB;border-top:none;border-radius:0 0 10px 10px;overflow:hidden;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,0.06);">
-            <div style="flex:1;padding:4px 2px;font-size:9px;font-weight:600;letter-spacing:0.055em;text-transform:uppercase;background:${mitA ? '#111' : '#fff'};color:${mitA ? '#fff' : '#888'};border-right:1px solid #E0E0E0;font-family:Inter,system-ui,sans-serif;line-height:1;text-align:center;">${mitLabel}</div>
-            <div style="flex:1;padding:4px 2px;font-size:9px;font-weight:600;letter-spacing:0.055em;text-transform:uppercase;background:${bueA ? '#111' : '#fff'};color:${bueA ? '#fff' : '#888'};font-family:Inter,system-ui,sans-serif;line-height:1;text-align:center;">${bueLabel}</div>
-          </div>`;
-          ovService.add(element.id, { position: { top: element.height, left: 0 }, html: c });
+        const { svg } = await (tempViewer as any).saveSVG();
+        // Parse SVG viewBox to get natural diagram dimensions
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+        const svgEl = svgDoc.querySelector('svg');
+        const vb = svgEl?.getAttribute('viewBox')?.split(' ').map(Number) ?? [0, 0, 800, 300];
+        const svgW = vb[2] || 800;
+        const svgH = vb[3] || 300;
+        // Render SVG to canvas at high resolution
+        const PAD = 20;
+        const scale = 3;
+        const canvasW = (svgW + PAD * 2) * scale;
+        const canvasH = (svgH + PAD * 2) * scale;
+        const dataUrl = await new Promise<string>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = canvasW;
+            c.height = canvasH;
+            const ctx = c.getContext('2d')!;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvasW, canvasH);
+            ctx.drawImage(img, PAD * scale, PAD * scale, svgW * scale, svgH * scale);
+            resolve(c.toDataURL('image/png'));
+          };
+          img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         });
-
-        // Hide bpmn.io watermark
-        const badge = tempBpmn.querySelector('.bjs-powered-by');
-        if (badge) (badge as HTMLElement).style.display = 'none';
-        const captured = await html2canvas(tempBpmn, { backgroundColor: '#FFFFFF', scale: 2 });
-        const bpmnRatio = captured.height / captured.width;
+        const bpmnRatio = canvasH / canvasW;
         let bpmnH = W * bpmnRatio;
-        if (bpmnH > 80) bpmnH = 80;
+        if (bpmnH > 120) bpmnH = 120;
         check(bpmnH + 10);
         label('1.1', t.resultsBpmnProcess);
-        doc.addImage(captured.toDataURL('image/png'), 'PNG', M, y, W, bpmnH);
+        doc.addImage(dataUrl, 'PNG', M, y, W, bpmnH);
         y += bpmnH + 5;
         doc.setDrawColor(...LINE);
-        doc.setLineWidth(0.15);
+        doc.setLineWidth(0.3);
         doc.line(M, y, M + W, y);
-        y += 6;
-      } catch (e) { /* BPMN capture failed, skip */ }
+        y += 8;
+      } catch (e) { /* skip */ }
       tempViewer.destroy();
       document.body.removeChild(tempBpmn);
     }
@@ -578,93 +607,114 @@ export const Results: React.FC = () => {
 
     addFooter();
 
-    // ═══ PAGE 2: RESULTS ═══
-    doc.addPage();
-    y = 20;
-    pageHeader();
+    // ═══ PAGES 2+: RESULTS ═══
 
-    // Section title with top spacing
+    // Sub-heading
+    const subheading = (num: string, text: string) => {
+      check(12);
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(...INK);
+      doc.text(num + '  ' + text, M, y);
+      y += 2;
+      doc.setDrawColor(...LINE); doc.setLineWidth(0.3);
+      doc.line(M, y, M + W, y);
+      y += 8;
+    };
+
+    // Section label (bold uppercase, no number)
+    const sLabel = (text: string) => {
+      check(10);
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(...INK);
+      doc.text(text.toUpperCase(), M, y);
+      y += 6;
+    };
+
+    const IMG_H = W * 0.4; // 320/800 aspect → 68mm at W=170
+
+    const embedChart = async (id: string, title: string) => {
+      check(IMG_H + 16);
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...INK);
+      doc.text(title, M, y); y += 5;
+      const result = await captureChart(id);
+      if (result) {
+        doc.addImage(result.img, 'PNG', M, y, W, IMG_H);
+        y += IMG_H + 9;
+      }
+    };
+
+    // ── Page 2: heading + 2.1 Kommunalsicht ──
+    doc.addPage(); y = 20; pageHeader();
     y += 8;
     heading('2.', t.navResults);
 
-    label('2.1', t.timeSavingsPerCase);
+    subheading('2.1', language === 'de' ? 'Kommunalsicht' : 'Municipality View');
+
+    sLabel(t.timeSavingsPerCase);
     kv(t.mitarbeiterMinSaved, perCase.mitarbeiterMinutesSaved.toFixed(1) + ' min');
-    kv(t.buergerMinSaved, perCase.buergerMinutesSaved.toFixed(1) + ' min');
-    y += 6;
+    y += 2;
 
-    label('2.2', t.costSavingsPerCase);
+    sLabel(t.costSavingsPerCase);
     kv(t.costSavingsPerCase, eur(perCase.costSavedPerCase));
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(...GRAY);
-    doc.text(`= (${perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) x ${hourlyRate} ${t.eurPerHour}`, M, y);
-    y += 10;
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...GRAY);
+    doc.text('= (' + perCase.mitarbeiterMinutesSaved.toFixed(1) + ' min / 60) × ' + hourlyRate + ' ' + t.eurPerHour, M, y);
+    y += 8;
 
-    label('2.3', t.breakEvenLabel);
+    sLabel(t.breakEvenLabel);
     if (breakEven) {
       kv(t.breakEvenDate, formatMonthLabel(breakEven.month, language));
       kv(t.breakEvenDuration, breakEven.monthsCount + ' ' + t.months);
     } else {
-      doc.setFontSize(9.5);
-      doc.setTextColor(...GRAY);
-      doc.text(t.breakEvenNotReached, M, y);
-      y += 5;
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...GRAY);
+      doc.text(t.breakEvenNotReached, M, y); y += 5;
+    }
+    y += 2;
+
+    sLabel(t.roiLabel);
+    if (roi !== null && timeSeries.length > 0) {
+      kv('ROI', roi.toFixed(1) + ' %');
+      kv(t.roiPeriod,
+        formatMonthLabel(timeSeries[0].month, language) + ' – ' +
+        formatMonthLabel(timeSeries[timeSeries.length - 1].month, language) +
+        ' (' + timeSeries.length + ' ' + t.months + ')'
+      );
+    } else {
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(...GRAY);
+      doc.text(t.roiNotAvailable, M, y); y += 5;
     }
     y += 6;
 
-    label('2.4', t.roiLabel);
-    if (roi !== null && timeSeries.length > 0) {
-      kv('ROI', roi.toFixed(1) + ' %');
-      kv(t.roiPeriod, formatMonthLabel(timeSeries[0].month, language) + ' – ' + formatMonthLabel(timeSeries[timeSeries.length - 1].month, language) + ` (${timeSeries.length} ${t.months})`);
-    } else {
-      doc.setFontSize(9.5);
-      doc.setTextColor(...GRAY);
-      doc.text(t.roiNotAvailable, M, y);
-      y += 5;
+    if (timeSeries.length > 0) {
+      await embedChart('pdf-mtb-monthly-time', t.monthlyTimeTitle);
+      await embedChart('pdf-mtb-cum-time', t.timeProjectionTitle);
+      await embedChart('pdf-mtb-monthly-eur', t.monthlyEurTitle);
+      await embedChart('pdf-mtb-cum-eur', t.eurProjectionTitle);
     }
 
-    // Separator line + spacing before charts
-    y += 12;
-    doc.setDrawColor(...LINE);
-    doc.setLineWidth(0.3);
-    doc.line(M, y, M + W, y);
-    y += 14;
+    addFooter();
 
-    // ═══ CHARTS — sequential, flowing after results ═══
-    const chartIds = [
-      { id: 'chart-monthly-time', num: '2.5', title: t.monthlyTimeTitle },
-      { id: 'chart-cum-time', num: '2.6', title: t.timeProjectionTitle },
-      { id: 'chart-monthly-eur', num: '2.7', title: t.monthlyEurTitle },
-      { id: 'chart-cum-eur', num: '2.8', title: t.eurProjectionTitle },
-    ];
+    // ── Page: 2.2 Bürgersicht ──
+    doc.addPage(); y = 20; pageHeader();
+    y += 8;
 
-    // Capture all charts first
-    const chartImages: { num: string; title: string; img: string; w: number; h: number }[] = [];
-    for (const chart of chartIds) {
-      const result = await captureChart(chart.id);
-      if (result) chartImages.push({ num: chart.num, title: chart.title, ...result });
-    }
+    subheading('2.2', language === 'de' ? 'Bürgersicht' : 'Citizen View');
 
-    const MAX_CHART_H = 110;
-    for (const ci of chartImages) {
-      const ratio = ci.h / ci.w;
-      let chartH = W * ratio;
-      if (chartH > MAX_CHART_H) chartH = MAX_CHART_H;
-      // Check if chart fits on current page, otherwise new page
-      const needed = chartH + 18; // title + chart + spacing
-      if (y + needed > 275) {
-        addFooter();
-        doc.addPage();
-        pageHeader();
-        y = 22;
-      }
-      label(ci.num, ci.title);
-      doc.addImage(ci.img, 'PNG', M, y, W, chartH);
-      y += chartH + 8;
-      doc.setDrawColor(...LINE);
-      doc.setLineWidth(0.15);
-      doc.line(M, y, M + W, y);
-      y += 10;
+    sLabel(t.timeSavingsPerCase);
+    kv(t.buergerMinSaved, perCase.buergerMinutesSaved.toFixed(1) + ' min');
+    y += 2;
+
+    sLabel(t.buergerCostSavingsPerCase);
+    kv(t.buergerCostSavingsPerCase, eur(perCase.buergerMinutesSaved / 60 * BUERGER_HOURLY_RATE));
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...GRAY);
+    doc.text('= (' + perCase.buergerMinutesSaved.toFixed(1) + ' min / 60) × ' + BUERGER_HOURLY_RATE + ' ' + t.eurPerHour, M, y);
+    y += 5;
+    const noteLines = doc.splitTextToSize(t.buergerHourlyRateNote, W);
+    doc.setFontSize(7); doc.text(noteLines, M, y);
+    y += (noteLines.length * 3.5) + 6;
+
+    if (timeSeries.length > 0) {
+      await embedChart('pdf-bue-monthly-time', t.monthlyTimeTitle);
+      await embedChart('pdf-bue-cum-time', t.timeProjectionTitle);
+      await embedChart('pdf-bue-monthly-eur', t.monthlyEurTitle);
+      await embedChart('pdf-bue-cum-eur', t.eurProjectionTitle);
     }
 
     addFooter();
@@ -994,21 +1044,74 @@ export const Results: React.FC = () => {
           </CollapsibleSection>
         </div>
 
+        {/* ── Results Section Heading + Sicht Toggle ── */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium uppercase tracking-widest text-hb-gray">{t.resultsSectionTitle}</h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-hb-gray uppercase tracking-wider font-medium">{language === 'de' ? 'Sicht' : 'View'}</span>
+            <div className="flex border border-hb-line">
+              <button
+                onClick={() => setSicht('Kommun')}
+                className={clsx('px-4 py-2 text-xs uppercase tracking-wider transition-colors',
+                  sicht === 'Kommun' ? 'bg-hb-ink text-white' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
+              >{language === 'de' ? 'Kommun' : 'Municipality'}</button>
+              <button
+                onClick={() => setSicht('Bürger')}
+                className={clsx('px-4 py-2 text-xs uppercase tracking-wider transition-colors border-l border-hb-line',
+                  sicht === 'Bürger' ? 'bg-hb-ink text-white' : 'bg-transparent text-hb-gray hover:bg-hb-paper')}
+              >{t.citizenLabel}</button>
+            </div>
+            {/* Info tooltip */}
+            <div className="relative group">
+              <button className="text-hb-gray/50 hover:text-hb-gray transition-colors">
+                <Info size={15} />
+              </button>
+              <div className="absolute right-0 top-6 z-50 w-64 p-3 bg-hb-ink text-white text-xs font-light leading-relaxed
+                opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-150">
+                {t.sichtToggleInfo}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* ═══════════════════════════════════════
             ROW 1 — ZEITERSPARNIS + KOSTENERSPARNIS
            ═══════════════════════════════════════ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="hb-card">
+        {sicht === 'Kommun' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="hb-card">
 
-            <h3 className="text-lg font-light mb-6 mt-2">{t.timeSavingsPerCase}</h3>
-            <div className="space-y-5">
+              <h3 className="text-lg font-light mb-6 mt-2">{t.timeSavingsPerCase}</h3>
+              <div className="space-y-5">
+                <div className="border-l-2 border-l-hb-ink pl-6">
+                  <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.mitarbeiterMinSaved}</h4>
+                  <p className="text-3xl font-display text-hb-ink">{perCase.mitarbeiterMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
+                  <p className="text-xs text-hb-gray/60 mt-1 font-mono">
+                    {stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isMitarbeiter(a); }).reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="hb-card">
+
+              <h3 className="text-lg font-light mb-6 mt-2">{t.costSavingsPerCase}</h3>
               <div className="border-l-2 border-l-hb-ink pl-6">
-                <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.mitarbeiterMinSaved}</h4>
-                <p className="text-3xl font-display text-hb-ink">{perCase.mitarbeiterMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
-                <p className="text-xs text-hb-gray/60 mt-1 font-mono">
-                  {stepDurations.filter(s => isMitarbeiter(s.actor)).reduce((a, s) => a + s.actual, 0)} min (analog) &rarr; {digitalSteps.filter(d => { const a = stepDurations.find(s => s.id === d.id)?.actor; return a && isMitarbeiter(a); }).reduce((a, d) => a + d.digitalDuration, 0)} min (digital)
+                <p className="text-4xl font-display text-hb-ink">{perCase.costSavedPerCase.toFixed(2)} <span className="text-lg text-hb-gray font-light">€</span></p>
+                <p className="text-xs text-hb-gray mt-2 font-light">
+                  = ({perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) &times; {hourlyRate} {t.eurPerHour}
                 </p>
               </div>
+              <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
+                <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+                <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.costSavingsPerCaseNote}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="hb-card">
+              <h3 className="text-lg font-light mb-6 mt-2">{t.timeSavingsPerCase}</h3>
               <div className="border-l-2 border-l-hb-line pl-6">
                 <h4 className="text-xs text-hb-gray uppercase tracking-wider font-medium mb-2">{t.buergerMinSaved}</h4>
                 <p className="text-3xl font-display text-hb-ink">{perCase.buergerMinutesSaved.toFixed(1)} <span className="text-lg text-hb-gray font-light">min</span></p>
@@ -1017,28 +1120,25 @@ export const Results: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="hb-card">
-
-            <h3 className="text-lg font-light mb-6 mt-2">{t.costSavingsPerCase}</h3>
-            <div className="border-l-2 border-l-hb-ink pl-6">
-              <p className="text-4xl font-display text-hb-ink">{perCase.costSavedPerCase.toFixed(2)} <span className="text-lg text-hb-gray font-light">€</span></p>
-              <p className="text-xs text-hb-gray mt-2 font-light">
-                = ({perCase.mitarbeiterMinutesSaved.toFixed(1)} min / 60) &times; {hourlyRate} {t.eurPerHour}
-              </p>
-            </div>
-            <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
-              <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
-              <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.costSavingsPerCaseNote}</p>
+            <div className="hb-card">
+              <h3 className="text-lg font-light mb-6 mt-2">{t.buergerCostSavingsPerCase}</h3>
+              <div className="border-l-2 border-l-hb-line pl-6">
+                <p className="text-4xl font-display text-hb-ink">
+                  {(perCase.buergerMinutesSaved / 60 * BUERGER_HOURLY_RATE).toFixed(2)} <span className="text-lg text-hb-gray font-light">€</span>
+                </p>
+              </div>
+              <div className="flex items-start mt-6 pt-4 border-t border-hb-line/50">
+                <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+                <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.buergerHourlyRateNote}</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* ═══════════════════════════════════════
             ROW 2 — BREAK-EVEN + ROI
            ═══════════════════════════════════════ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {sicht === 'Kommun' && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="hb-card">
             <h3 className="text-lg font-light mb-6">{t.breakEvenLabel}</h3>
             {breakEven ? (
@@ -1092,7 +1192,7 @@ export const Results: React.FC = () => {
               <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.roiDesc}</p>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* ═══════════════════════════════════════
             SECTION 4a — EINSPARUNGSPROGNOSE (ZEIT) — monatlich
@@ -1124,8 +1224,8 @@ export const Results: React.FC = () => {
                       wrapperStyle={{ fontSize: 12, fontWeight: 300 }}
                       formatter={(value: string) => value === t.monthlyMitarbeiterH ? 'Mitarbeiter' : 'Bürger'}
                     />
-                    <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" name={t.monthlyMitarbeiterH} />
-                    <Bar dataKey={t.monthlyBuergerH} fill="#999999" name={t.monthlyBuergerH} />
+                    {sicht === 'Kommun' && <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" name={t.monthlyMitarbeiterH} />}
+                    {sicht === 'Bürger' && <Bar dataKey={t.monthlyBuergerH} fill="#444444" name={t.monthlyBuergerH} />}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1148,19 +1248,6 @@ export const Results: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* Toggle legend */}
-              <div className="flex items-center gap-6 mt-4 mb-6">
-                <button onClick={() => setShowMitarbeiter(!showMitarbeiter)}
-                  className={clsx('flex items-center gap-2 text-xs uppercase tracking-wider transition-opacity', !showMitarbeiter && 'opacity-30')}>
-                  <span className="w-5 h-0.5 bg-hb-ink inline-block" />
-                  {t.mitarbeiterHoursFreed}
-                </button>
-                <button onClick={() => setShowBuerger(!showBuerger)}
-                  className={clsx('flex items-center gap-2 text-xs uppercase tracking-wider transition-opacity', !showBuerger && 'opacity-30')}>
-                  <span className="w-5 h-0.5 bg-hb-gray inline-block" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #666 0, #666 4px, transparent 4px, transparent 6px)' }} />
-                  {t.buergerHoursFreed}
-                </button>
-              </div>
 
               <div id="chart-cum-time">
                 <div className="h-80">
@@ -1172,15 +1259,24 @@ export const Results: React.FC = () => {
                       <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
                         label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
                       <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
-                      {showMitarbeiter && (
+                      <Legend
+                        verticalAlign="top"
+                        align="right"
+                        iconType="line"
+                        wrapperStyle={{ fontSize: 12, fontWeight: 300 }}
+                        payload={sicht === 'Kommun'
+                          ? [{ value: t.mitarbeiterHoursFreed, type: 'line', color: '#111111' }]
+                          : [{ value: t.buergerHoursFreed, type: 'line', color: '#444444' }]}
+                      />
+                      {sicht === 'Kommun' && (
                         <Line type="monotone" dataKey={t.mitarbeiterHoursFreed} stroke="#111111" strokeWidth={2}
                           dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
                           activeDot={{ r: 5, fill: '#111111' }} />
                       )}
-                      {showBuerger && (
-                        <Line type="monotone" dataKey={t.buergerHoursFreed} stroke="#666666" strokeWidth={2} strokeDasharray="4 2"
-                          dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#666666', strokeWidth: 2 } : false}
-                          activeDot={{ r: 5, fill: '#666666' }} />
+                      {sicht === 'Bürger' && (
+                        <Line type="monotone" dataKey={t.buergerHoursFreed} stroke="#444444" strokeWidth={2} strokeDasharray="4 2"
+                          dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#444444', strokeWidth: 2 } : false}
+                          activeDot={{ r: 5, fill: '#444444' }} />
                       )}
                     </LineChart>
                   </ResponsiveContainer>
@@ -1194,7 +1290,7 @@ export const Results: React.FC = () => {
         {/* ═══════════════════════════════════════
             SECTION 5a — EINSPARUNGSPROGNOSE (EUR) — monatlich
            ═══════════════════════════════════════ */}
-        <div className="hb-card">
+        {sicht === 'Kommun' && <div className="hb-card">
 
           <h3 className="text-lg font-light mb-2 mt-2">{t.monthlyEurTitle}</h3>
 
@@ -1227,12 +1323,12 @@ export const Results: React.FC = () => {
             <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
             <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.monthlyEurNote}</p>
           </div>
-        </div>
+        </div>}
 
         {/* ═══════════════════════════════════════
             SECTION 5b — KUMULIERTE EINSPARUNGSPROGNOSE (EUR)
            ═══════════════════════════════════════ */}
-        <div className="hb-card">
+        {sicht === 'Kommun' && <div className="hb-card">
 
           <h3 className="text-lg font-light mb-2 mt-2">{t.eurProjectionTitle}</h3>
 
@@ -1284,7 +1380,236 @@ export const Results: React.FC = () => {
             <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
             <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.cumulativeEurNote}</p>
           </div>
-        </div>
+        </div>}
+
+        {/* ═══════════════════════════════════════
+            SECTION 6a — EINSPARUNGSPROGNOSE (EUR) — BÜRGER
+           ═══════════════════════════════════════ */}
+        {sicht === 'Bürger' && <div className="hb-card">
+          <h3 className="text-lg font-light mb-2 mt-2">{t.monthlyEurTitle}</h3>
+          {timeSeries.length === 0 ? (
+            <div className="flex items-center gap-3 bg-hb-paper border border-hb-line p-4 mt-4 text-sm text-hb-gray font-light">
+              <Info size={16} className="flex-shrink-0" />
+              {t.noIntervalsWarning}
+            </div>
+          ) : (
+            <div className="mt-6">
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={buergerMonthlyEurData} margin={{ left: 10, right: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                    <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                      label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                    <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" />
+                    <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                    <Bar dataKey={t.buergerEurSavLabel} fill="#444444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {intervalLabels}
+            </div>
+          )}
+          <div className="flex items-start mt-4 pt-4 border-t border-hb-line/50">
+            <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+            <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.buergerHourlyRateNote}</p>
+          </div>
+        </div>}
+
+        {/* ═══════════════════════════════════════
+            SECTION 6b — KUMULIERTE EINSPARUNGSPROGNOSE (EUR) — BÜRGER
+           ═══════════════════════════════════════ */}
+        {sicht === 'Bürger' && <div className="hb-card">
+          <h3 className="text-lg font-light mb-2 mt-2">{t.eurProjectionTitle}</h3>
+          {timeSeries.length === 0 ? (
+            <div className="flex items-center gap-3 bg-hb-paper border border-hb-line p-4 mt-4 text-sm text-hb-gray font-light">
+              <Info size={16} className="flex-shrink-0" />
+              {t.noIntervalsWarning}
+            </div>
+          ) : (
+            <div>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={buergerCumEurData} margin={{ left: 10, right: 30 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                    <XAxis dataKey="idx" type="number" domain={[0, timeSeries.length - 1]}
+                      ticks={buergerCumEurData.map(d => d.idx)}
+                      tickFormatter={(i: number) => buergerCumEurData[i]?.month ?? ''}
+                      stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                    <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                      tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                      label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                    <ReferenceLine y={0} stroke="#666666" strokeWidth={1.5} strokeDasharray="6 3" />
+                    <Tooltip {...tooltipStyle}
+                      labelFormatter={(i: number) => buergerCumEurData[i]?.month ?? ''}
+                      formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                    <Line type="monotone" dataKey={t.buergerCumEurLabel} stroke="#444444" strokeWidth={2} strokeDasharray="4 2"
+                      dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#444444', strokeWidth: 2 } : false}
+                      activeDot={{ r: 5, fill: '#444444' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              {intervalLabels}
+            </div>
+          )}
+          <div className="flex items-start mt-4 pt-4 border-t border-hb-line/50">
+            <Info className="h-4 w-4 text-hb-gray mt-0.5 flex-shrink-0" />
+            <p className="ml-3 text-xs text-hb-gray font-light leading-relaxed">{t.buergerHourlyRateNote}</p>
+          </div>
+        </div>}
+
+
+        {/* ── Hidden off-screen charts for PDF capture ── */}
+        {timeSeries.length > 0 && (
+          <div style={{ position: 'absolute', left: '-9999px', top: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+            {/* PDF Kommunal 1: Monthly Time */}
+            <div id="pdf-mtb-monthly-time" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyTimeData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                  <Bar dataKey={t.monthlyMitarbeiterH} fill="#111111" name={t.monthlyMitarbeiterH} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Kommunal 2: Cumulative Time */}
+            <div id="pdf-mtb-cum-time" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timeChartData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                  <Line type="monotone" dataKey={t.mitarbeiterHoursFreed} stroke="#111111" strokeWidth={2}
+                    dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
+                    activeDot={{ r: 5, fill: '#111111' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Kommunal 3: Monthly EUR */}
+            <div id="pdf-mtb-monthly-eur" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyEurData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                    label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                  <Bar dataKey={t.monthlyNetSavings} fill="#111111" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Kommunal 4: Cumulative EUR */}
+            <div id="pdf-mtb-cum-eur" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={eurChartData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="idx" type="number" domain={[0, timeSeries.length - 1]}
+                    ticks={eurChartData.map(d => d.idx)}
+                    tickFormatter={(i: number) => eurChartData[i]?.month ?? ''}
+                    stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                    label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <ReferenceLine y={0} stroke="#666666" strokeWidth={1.5} strokeDasharray="6 3" />
+                  {breakEvenPoint && (
+                    <ReferenceDot x={breakEvenPoint.x} y={0}
+                      r={6} fill="#111111" stroke="#FFFFFF" strokeWidth={2}
+                      label={{ value: breakEvenPoint.label, fill: '#111111', fontSize: 10, fontWeight: 600, position: 'top', offset: 14 }} />
+                  )}
+                  <Tooltip {...tooltipStyle}
+                    labelFormatter={(i: number) => eurChartData[i]?.month ?? ''}
+                    formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                  <Line type="monotone" dataKey={t.cumulativeNetSavings} stroke="#111111" strokeWidth={2}
+                    dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#111111', strokeWidth: 2 } : false}
+                    activeDot={{ r: 5, fill: '#111111' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Bürger 1: Monthly Time */}
+            <div id="pdf-bue-monthly-time" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyTimeData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                  <Bar dataKey={t.monthlyBuergerH} fill="#444444" name={t.monthlyBuergerH} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Bürger 2: Cumulative Time */}
+            <div id="pdf-bue-cum-time" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={timeChartData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    label={{ value: t.hoursAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => `${value.toFixed(1)} h`} />
+                  <Line type="monotone" dataKey={t.buergerHoursFreed} stroke="#444444" strokeWidth={2} strokeDasharray="4 2"
+                    dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#444444', strokeWidth: 2 } : false}
+                    activeDot={{ r: 5, fill: '#444444' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Bürger 3: Monthly EUR */}
+            <div id="pdf-bue-monthly-eur" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={buergerMonthlyEurData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="month" stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                    label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <ReferenceLine y={0} stroke="#E0E0E0" strokeDasharray="3 3" />
+                  <Tooltip {...tooltipStyle} formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                  <Bar dataKey={t.buergerEurSavLabel} fill="#444444" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* PDF Bürger 4: Cumulative EUR */}
+            <div id="pdf-bue-cum-eur" style={{ width: 800, height: 320, background: '#ffffff' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={buergerCumEurData} margin={{ left: 10, right: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                  <XAxis dataKey="idx" type="number" domain={[0, timeSeries.length - 1]}
+                    ticks={buergerCumEurData.map(d => d.idx)}
+                    tickFormatter={(i: number) => buergerCumEurData[i]?.month ?? ''}
+                    stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    interval={timeSeries.length > 24 ? Math.floor(timeSeries.length / 12) : timeSeries.length > 12 ? 2 : 0} />
+                  <YAxis stroke="#666666" tick={{ fill: '#666666', fontSize: 11 }} tickLine={false} axisLine={false}
+                    tickFormatter={(v: number) => Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
+                    label={{ value: t.euroAxisLabel, angle: -90, position: 'insideLeft', style: { fill: '#666666', fontSize: 11 } }} />
+                  <ReferenceLine y={0} stroke="#666666" strokeWidth={1.5} strokeDasharray="6 3" />
+                  <Tooltip {...tooltipStyle}
+                    labelFormatter={(i: number) => buergerCumEurData[i]?.month ?? ''}
+                    formatter={(value: number) => value.toLocaleString(locale, { style: 'currency', currency: 'EUR' })} />
+                  <Line type="monotone" dataKey={t.buergerCumEurLabel} stroke="#444444" strokeWidth={2} strokeDasharray="4 2"
+                    dot={timeSeries.length <= 24 ? { r: 3, fill: '#FFFFFF', stroke: '#444444', strokeWidth: 2 } : false}
+                    activeDot={{ r: 5, fill: '#444444' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* ── Navigation ── */}
         <div className="flex justify-between border-t border-hb-line/50 pt-8">

@@ -3,8 +3,6 @@ import React, { useEffect, useRef } from 'react';
 import BpmnModeler from 'bpmn-js/lib/Modeler';
 import 'bpmn-js/dist/assets/diagram-js.css';
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { Download, Star } from 'lucide-react';
 import { useLangStore } from '../store/useLangStore';
 import { createRoot, Root } from 'react-dom/client';
@@ -133,8 +131,6 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
   const overlayRootsRef = useRef<Root[]>([]);
-  const { language } = useLangStore();
-  const locale = language === 'de' ? 'de-DE' : 'en-US';
 
   const refreshOverlays = (modeler: any) => {
     const elementRegistry = modeler.get('elementRegistry');
@@ -173,39 +169,43 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
 
     modelerRef.current = modeler;
 
-    try {
-      modeler.importXML(xml).then(({ warnings }: any) => {
-        if (warnings.length) {
-          console.warn('BPMN Import Warnings', warnings);
+    modeler.importXML(xml).then(({ warnings }: any) => {
+      // Guard: if this modeler is no longer active (e.g. React Strict Mode
+      // double-invoke, or component remounted), bail out so the stale callback
+      // doesn't clear the overlay roots that the correct modeler already set up.
+      if (modelerRef.current !== modeler) return;
+
+      if (warnings.length) {
+        console.warn('BPMN Import Warnings', warnings);
+      }
+      const canvas = modeler.get('canvas') as any;
+      canvas.zoom('fit-viewport');
+      const zoomLevel = canvas.zoom();
+      canvas.zoom(zoomLevel * 0.85);
+
+      // Add actor overlays below each task
+      refreshOverlays(modeler);
+
+      // Auto-save on every diagram change (name edit, move, add, delete, etc.)
+      const eventBus = modeler.get('eventBus') as any;
+      eventBus.on('commandStack.changed', async () => {
+        try {
+          const result = await modeler.saveXML({ format: true });
+          onSave(result.xml!);
+        } catch (e) {
+          console.error('BPMN auto-save failed', e);
         }
-        const canvas = modeler.get('canvas');
-        canvas.zoom('fit-viewport');
-        const zoomLevel = canvas.zoom();
-        canvas.zoom(zoomLevel * 0.85);
-
-        // Add actor overlays below each task
+        // Refresh overlays after diagram changes (new tasks, deletions)
         refreshOverlays(modeler);
-
-        // Auto-save on every diagram change (name edit, move, add, delete, etc.)
-        const eventBus = modeler.get('eventBus');
-        eventBus.on('commandStack.changed', async () => {
-          try {
-            const result = await modeler.saveXML({ format: true });
-            onSave(result.xml);
-          } catch (e) {
-            console.error('BPMN auto-save failed', e);
-          }
-          // Refresh overlays after diagram changes (new tasks, deletions)
-          refreshOverlays(modeler);
-        });
       });
-    } catch (err) {
+    }).catch((err: any) => {
       console.error('BPMN Import Error', err);
-    }
+    });
 
     return () => {
       overlayRootsRef.current.forEach(r => r.unmount());
       overlayRootsRef.current = [];
+      modelerRef.current = null; // clear ref so any in-flight .then() bails out above
       modeler.destroy();
     };
   }, []);
@@ -222,59 +222,42 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
     canvas.zoom(canvas.zoom() / 1.2);
   };
 
-  const handleDownloadPdf = async () => {
-    if (!modelerRef.current || !containerRef.current) return;
+  const handleDownloadPng = async () => {
+    if (!modelerRef.current) return;
     try {
-      // Hide palette, context pad, and watermark before capture
-      const palette = containerRef.current.querySelector('.djs-palette') as HTMLElement | null;
-      const contextPad = containerRef.current.querySelector('.djs-context-pad') as HTMLElement | null;
-      const badge = containerRef.current.querySelector('.bjs-powered-by') as HTMLElement | null;
-      if (palette) palette.style.display = 'none';
-      if (contextPad) contextPad.style.display = 'none';
-      if (badge) badge.style.display = 'none';
-
-      const captured = await html2canvas(containerRef.current, { backgroundColor: '#FFFFFF', scale: 3 });
-
-      // Restore hidden elements
-      if (palette) palette.style.display = '';
-      if (contextPad) contextPad.style.display = '';
-      if (badge) badge.style.display = '';
-
-      // Calculate dimensions to fit A4 landscape with padding
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageW = 297;
-      const pageH = 210;
-      const pad = 15;
-      const maxW = pageW - pad * 2;
-      const maxH = pageH - pad * 2 - 20; // room for header
-
-      const ratio = captured.height / captured.width;
-      let w = maxW;
-      let h = w * ratio;
-      if (h > maxH) { h = maxH; w = h / ratio; }
-
-      // Header
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(14);
-      pdf.setTextColor(17, 17, 17);
-      pdf.text('DiviData - Prozessmodell (BPMN)', pad, pad + 4);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(102, 102, 102);
-      pdf.text(new Date().toLocaleDateString(locale), pageW - pad, pad + 4, { align: 'right' });
-
-      const xOff = pad + (maxW - w) / 2;
-      const yOff = pad + 12 + (maxH - h) / 2;
-      pdf.addImage(captured.toDataURL('image/png'), 'PNG', xOff, yOff, w, h);
-
-      // Footer
-      pdf.setFontSize(7);
-      pdf.setTextColor(170, 170, 170);
-      pdf.text('BPMN 2.0 Standard Notation  |  DiviData', pageW / 2, pageH - 8, { align: 'center' });
-
-      pdf.save('prozessmodell-bpmn.pdf');
+      const { svg } = await modelerRef.current.saveSVG();
+      // Parse viewBox for exact diagram dimensions
+      const parser = new DOMParser();
+      const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
+      const svgEl = svgDoc.querySelector('svg');
+      const vb = svgEl?.getAttribute('viewBox')?.split(' ').map(Number) ?? [0, 0, 800, 300];
+      const svgW = vb[2] || 800;
+      const svgH = vb[3] || 300;
+      const PAD = 40;
+      const scale = 3;
+      const canvasW = (svgW + PAD * 2) * scale;
+      const canvasH = (svgH + PAD * 2) * scale;
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = canvasW;
+          c.height = canvasH;
+          const ctx = c.getContext('2d')!;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvasW, canvasH);
+          ctx.drawImage(img, PAD * scale, PAD * scale, svgW * scale, svgH * scale);
+          resolve(c.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'prozessmodell-bpmn.png';
+      a.click();
     } catch (err) {
-      console.error('BPMN PDF export failed', err);
+      console.error('BPMN PNG export failed', err);
     }
   };
 
@@ -293,11 +276,11 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
           </button>
         )}
         <button
-          onClick={handleDownloadPdf}
+          onClick={handleDownloadPng}
           className="flex items-center gap-2 bg-white border border-hb-line text-hb-ink hover:border-hb-ink px-4 py-2 text-xs font-mono uppercase tracking-widest transition-colors shadow-sm"
         >
           <Download size={14} />
-          PDF
+          PNG
         </button>
       </div>
       {/* Zoom controls — left side, below palette */}

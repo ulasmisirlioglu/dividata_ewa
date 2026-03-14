@@ -145,6 +145,8 @@ interface Translation {
 
   // Results - Rebuilt sections
   resultsInputsTitle: string;
+  resultsSectionTitle: string;
+  sichtToggleInfo: string;
   resultsAnalogSteps: string;
   resultsSalary: string;
   resultsDigitalSteps: string;
@@ -153,6 +155,10 @@ interface Translation {
   timeSavingsPerCase: string;
   mitarbeiterMinSaved: string;
   buergerMinSaved: string;
+  buergerCostSavingsPerCase: string;
+  buergerHourlyRateNote: string;
+  buergerEurSavLabel: string;
+  buergerCumEurLabel: string;
   costSavingsPerCase: string;
   costSavingsPerCaseNote: string;
   monthlyTimeTitle: string;
@@ -396,6 +402,8 @@ const translations: Record<Language, Translation> = {
     casesMonth: 'Fälle / Monat',
 
     resultsInputsTitle: 'Eingabeparameter',
+    resultsSectionTitle: 'Ergebnisse',
+    sichtToggleInfo: 'Wechseln Sie zwischen der Kommunalsicht und der Bürgersicht (zeitliche und geldliche Einsparungen durch Prozessdigitalisierung für Mitarbeiter/Bürger).',
     resultsAnalogSteps: 'Analoge Schritte',
     resultsSalary: 'Tarifgruppe & Stundenlohn',
     resultsDigitalSteps: 'Digitale Schritte',
@@ -404,6 +412,10 @@ const translations: Record<Language, Translation> = {
     timeSavingsPerCase: 'Zeitersparnis pro Fall',
     mitarbeiterMinSaved: 'Mitarbeiter-Minuten eingespart',
     buergerMinSaved: 'Bürger-Minuten eingespart',
+    buergerCostSavingsPerCase: 'Kostenersparnis pro Fall',
+    buergerHourlyRateNote: '€23,15/h – Rechnerischer Brutto-Medianstundenlohn für Vollzeitbeschäftigte (Quelle: BA, Entgeltstatistik 2024)',
+    buergerEurSavLabel: 'Kostenersparnis Bürger / Monat (€)',
+    buergerCumEurLabel: 'Kumulierte Kostenersparnis Bürger (€)',
     costSavingsPerCase: 'Kostenersparnis pro Fall',
     costSavingsPerCaseNote: 'Nur aus Mitarbeitersicht (kommunale Sicht). Einmalige Digitalisierungskosten sind nicht enthalten.',
     monthlyTimeTitle: 'Einsparungsprognose (Zeit)',
@@ -633,6 +645,8 @@ const translations: Record<Language, Translation> = {
     casesMonth: 'Cases / Month',
 
     resultsInputsTitle: 'Input Parameters',
+    resultsSectionTitle: 'Results',
+    sichtToggleInfo: 'Switch between the municipality view and the citizen view (time and cost savings from process digitization for employees/citizens).',
     resultsAnalogSteps: 'Analog Steps',
     resultsSalary: 'Tariff Group & Hourly Rate',
     resultsDigitalSteps: 'Digital Steps',
@@ -641,6 +655,10 @@ const translations: Record<Language, Translation> = {
     timeSavingsPerCase: 'Time Savings per Case',
     mitarbeiterMinSaved: 'Employee Minutes Saved',
     buergerMinSaved: 'Citizen Minutes Saved',
+    buergerCostSavingsPerCase: 'Cost Savings per Case',
+    buergerHourlyRateNote: '€23.15/h – Calculated gross median hourly wage for full-time employees (Source: BA, Wage Statistics 2024)',
+    buergerEurSavLabel: 'Cost Savings Citizen / Month (€)',
+    buergerCumEurLabel: 'Cumulative Cost Savings Citizen (€)',
     costSavingsPerCase: 'Cost Savings per Case',
     costSavingsPerCaseNote: 'Employee costs only (municipal perspective). One-time digitalization costs are not included.',
     monthlyTimeTitle: 'Savings Projection (Time)',
