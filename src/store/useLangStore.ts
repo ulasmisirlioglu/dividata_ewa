@@ -265,6 +265,8 @@ interface Translation {
   // BPMN info box
   bpmnInfoTitle: string;
   bpmnInfoDesc: string;
+  bpmnInfoActorTitle: string;
+  bpmnInfoActorDesc: string;
 }
 
 const translations: Record<Language, Translation> = {
@@ -510,6 +512,8 @@ const translations: Record<Language, Translation> = {
 
     bpmnInfoTitle: 'Bevor Sie fortfahren',
     bpmnInfoDesc: 'Überprüfen Sie den vorgeschlagenen Prozess und bearbeiten Sie ihn bei Bedarf. Kontrollieren Sie für jeden Schritt den zugewiesenen Akteur und passen Sie ihn ggf. an — Sie können {employee}, {citizen} oder beide auswählen. Mindestens ein Akteur pro Schritt ist erforderlich. Bei beiden Akteuren werden die Dauern im nächsten Schritt separat erfasst.',
+    bpmnInfoActorTitle: 'Warum sind bei manchen Schritten beide Akteure vorausgewählt?',
+    bpmnInfoActorDesc: 'Wenn ein Schritt von einem Akteur ausgeführt wird, während der andere dabei anwesend sein oder warten muss, sollten beide Akteure ausgewählt werden. Beispiel: Beim Schritt „Identifikation prüfen" führt der {employee} die Prüfung durch, doch auch der {citizen} muss seinen Ausweis vorlegen und warten. Da beide Seiten in diesem Schritt Zeit aufwenden, sind standardmäßig beide Akteure markiert.',
   },
   en: {
     navDashboard: 'Dashboard',
@@ -753,6 +757,8 @@ const translations: Record<Language, Translation> = {
 
     bpmnInfoTitle: 'Before you continue',
     bpmnInfoDesc: 'Review the suggested process below and edit it if needed. For each task, check the assigned actor and adjust if necessary — you can select {employee}, {citizen}, or both. At least one actor per task is required. When both are selected, durations will be set separately for each actor in the next step.',
+    bpmnInfoActorTitle: 'Why are both actors preselected for some steps?',
+    bpmnInfoActorDesc: 'When a step is performed by one actor while the other must be present or wait, both actors should be selected. For example: During the "Identity verification" step, the {employee} performs the check, but the {citizen} must also present their ID and wait. Since both parties spend time on this step, both actors are selected by default.',
   }
 };
 

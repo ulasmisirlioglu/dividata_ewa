@@ -221,11 +221,11 @@ const defaultStepDurations: StepDuration[] = [
   { id: 'Task_1', name: 'Anmeldeformular ausfüllen (Papier)', actual: 0, actualBuerger: 0, actor: 'Bürger' },
   { id: 'Task_2', name: 'Wartenummer ziehen', actual: 0, actualBuerger: 0, actor: 'Bürger' },
   { id: 'Task_3', name: 'Warten bis Aufruf', actual: 0, actualBuerger: 0, actor: 'Bürger' },
-  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_6', name: 'Bescheinigung drucken', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_7', name: 'Gebühren kassieren', actual: 0, actualBuerger: 0, actor: 'Mitarbeiter' },
-  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', actual: 0, actualBuerger: 0, actor: 'Bürger' },
+  { id: 'Task_4', name: 'Identifikation prüfen (Ausweis)', actual: 0, actualBuerger: 0, actor: 'Beide' },
+  { id: 'Task_5', name: 'Daten erfassen (Fachverfahren)', actual: 0, actualBuerger: 0, actor: 'Beide' },
+  { id: 'Task_6', name: 'Bescheinigung drucken', actual: 0, actualBuerger: 0, actor: 'Beide' },
+  { id: 'Task_7', name: 'Gebühren kassieren', actual: 0, actualBuerger: 0, actor: 'Beide' },
+  { id: 'Task_8', name: 'Bescheinigung entgegennehmen', actual: 0, actualBuerger: 0, actor: 'Beide' },
   { id: 'Task_Rueckreise', name: 'Rückreise vom Amt', actual: 0, actualBuerger: 0, actor: 'Bürger' },
 ];
 

@@ -131,6 +131,9 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<any>(null);
   const overlayRootsRef = useRef<Root[]>([]);
+  // Track the last XML that was imported or saved by the editor itself,
+  // so we can distinguish external xml prop changes from internal auto-saves.
+  const lastXmlRef = useRef<string>(xml);
 
   const refreshOverlays = (modeler: any) => {
     const elementRegistry = modeler.get('elementRegistry');
@@ -169,6 +172,7 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
 
     modelerRef.current = modeler;
 
+    lastXmlRef.current = xml;
     modeler.importXML(xml).then(({ warnings }: any) => {
       // Guard: if this modeler is no longer active (e.g. React Strict Mode
       // double-invoke, or component remounted), bail out so the stale callback
@@ -191,6 +195,7 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
       eventBus.on('commandStack.changed', async () => {
         try {
           const result = await modeler.saveXML({ format: true });
+          lastXmlRef.current = result.xml!;
           onSave(result.xml!);
         } catch (e) {
           console.error('BPMN auto-save failed', e);
@@ -209,6 +214,24 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
       modeler.destroy();
     };
   }, []);
+
+  // Re-import XML when the prop changes externally (e.g. Supabase project load)
+  // but skip when the change came from the editor's own auto-save.
+  useEffect(() => {
+    const modeler = modelerRef.current;
+    if (!modeler || xml === lastXmlRef.current) return;
+    lastXmlRef.current = xml;
+    modeler.importXML(xml).then(({ warnings }: any) => {
+      if (modelerRef.current !== modeler) return;
+      if (warnings.length) console.warn('BPMN Import Warnings', warnings);
+      const canvas = modeler.get('canvas') as any;
+      canvas.zoom('fit-viewport');
+      canvas.zoom(canvas.zoom() * 0.85);
+      refreshOverlays(modeler);
+    }).catch((err: any) => {
+      console.error('BPMN re-import error', err);
+    });
+  }, [xml]);
 
   const handleZoomIn = () => {
     if (!modelerRef.current) return;
@@ -231,12 +254,33 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
       const svgDoc = parser.parseFromString(svg, 'image/svg+xml');
       const svgEl = svgDoc.querySelector('svg');
       const vb = svgEl?.getAttribute('viewBox')?.split(' ').map(Number) ?? [0, 0, 800, 300];
+      const vbX = vb[0];
+      const vbY = vb[1];
       const svgW = vb[2] || 800;
       const svgH = vb[3] || 300;
       const PAD = 40;
+      const ACTOR_EXTRA = 30;
       const scale = 3;
       const canvasW = (svgW + PAD * 2) * scale;
-      const canvasH = (svgH + PAD * 2) * scale;
+      const canvasH = (svgH + PAD * 2 + ACTOR_EXTRA) * scale;
+
+      // Gather task positions and actor labels
+      const elementRegistry = modelerRef.current.get('elementRegistry');
+      const { stepDurations } = useStore.getState();
+      const { t } = useLangStore.getState();
+      const tasks = elementRegistry.filter((el: any) => el.type === 'bpmn:Task').map((el: any) => {
+        const step = stepDurations.find((s: any) => s.id === el.id);
+        let actorLabel = '';
+        if (step) {
+          const mit = isMitarbeiter(step.actor);
+          const bue = isBuerger(step.actor);
+          if (mit && bue) actorLabel = `${t.employeeLabel} & ${t.citizenLabel}`;
+          else if (mit) actorLabel = t.employeeLabel;
+          else if (bue) actorLabel = t.citizenLabel;
+        }
+        return { x: el.x, y: el.y, width: el.width, height: el.height, actorLabel };
+      });
+
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
@@ -247,6 +291,42 @@ export const BPMNEditor: React.FC<BPMNEditorProps> = ({ xml, onSave, onSetAsDefa
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvasW, canvasH);
           ctx.drawImage(img, PAD * scale, PAD * scale, svgW * scale, svgH * scale);
+
+          // Draw actor labels below each task
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          const fontSize = 9 * scale;
+          ctx.font = `600 ${fontSize}px "Inter", system-ui, sans-serif`;
+          tasks.forEach((task: any) => {
+            if (!task.actorLabel) return;
+            const cx = (task.x + task.width / 2 - vbX + PAD) * scale;
+            const cy = (task.y + task.height - vbY + PAD) * scale + 4 * scale;
+            const textW = ctx.measureText(task.actorLabel).width;
+            const pillPadX = 8 * scale;
+            const pillH = 16 * scale;
+            const pillW = textW + pillPadX * 2;
+            const r = 4 * scale;
+            const rx = cx - pillW / 2;
+            const ry = cy;
+            // Rounded rectangle background
+            ctx.beginPath();
+            ctx.moveTo(rx + r, ry);
+            ctx.lineTo(rx + pillW - r, ry);
+            ctx.quadraticCurveTo(rx + pillW, ry, rx + pillW, ry + r);
+            ctx.lineTo(rx + pillW, ry + pillH - r);
+            ctx.quadraticCurveTo(rx + pillW, ry + pillH, rx + pillW - r, ry + pillH);
+            ctx.lineTo(rx + r, ry + pillH);
+            ctx.quadraticCurveTo(rx, ry + pillH, rx, ry + pillH - r);
+            ctx.lineTo(rx, ry + r);
+            ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+            ctx.closePath();
+            ctx.fillStyle = '#111111';
+            ctx.fill();
+            // Text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(task.actorLabel, cx, cy + 3 * scale);
+          });
+
           resolve(c.toDataURL('image/png'));
         };
         img.onerror = reject;

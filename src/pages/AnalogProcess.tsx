@@ -99,6 +99,17 @@ export const AnalogProcess: React.FC = () => {
                   )}
                 </p>
               </div>
+              <div className="flex items-start bg-white border border-hb-line p-5 mb-6">
+                <Info className="h-5 w-5 text-hb-ink mt-0.5 flex-shrink-0" />
+                <p className="ml-4 text-sm text-hb-gray leading-relaxed font-light">
+                  <span className="font-medium text-hb-ink block mb-1">{t.bpmnInfoActorTitle}</span>
+                  {t.bpmnInfoActorDesc.split(/(\{employee\}|\{citizen\})/).map((part, i) =>
+                    part === '{employee}' ? <span key={i} className="font-medium text-hb-ink">{t.employeeLabel}</span> :
+                    part === '{citizen}' ? <span key={i} className="font-medium text-hb-ink">{t.citizenLabel}</span> :
+                    <React.Fragment key={i}>{part}</React.Fragment>
+                  )}
+                </p>
+              </div>
 
               <div className="rounded-none overflow-hidden border border-hb-line shadow-2xl shadow-black/5">
                  {/* Wrapper for the white editor to make it look like a page */}

@@ -366,10 +366,29 @@ export const Results: React.FC = () => {
         const svgW = vb[2] || 800;
         const svgH = vb[3] || 300;
         // Render SVG to canvas at high resolution
+        const vbX = vb[0];
+        const vbY = vb[1];
         const PAD = 20;
+        const ACTOR_EXTRA = 24;
         const scale = 3;
         const canvasW = (svgW + PAD * 2) * scale;
-        const canvasH = (svgH + PAD * 2) * scale;
+        const canvasH = (svgH + PAD * 2 + ACTOR_EXTRA) * scale;
+
+        // Gather task positions and actor labels from the temp viewer
+        const elReg = tempViewer.get('elementRegistry');
+        const pdfTasks = elReg.filter((el: any) => el.type === 'bpmn:Task').map((el: any) => {
+          const step = stepDurations.find((s: any) => s.id === el.id);
+          let actorLabel = '';
+          if (step) {
+            const mit = isMitarbeiter(step.actor);
+            const bue = isBuerger(step.actor);
+            if (mit && bue) actorLabel = `${t.employeeLabel} & ${t.citizenLabel}`;
+            else if (mit) actorLabel = t.employeeLabel;
+            else if (bue) actorLabel = t.citizenLabel;
+          }
+          return { x: el.x, y: el.y, width: el.width, height: el.height, actorLabel };
+        });
+
         const dataUrl = await new Promise<string>((resolve) => {
           const img = new Image();
           img.onload = () => {
@@ -380,6 +399,40 @@ export const Results: React.FC = () => {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvasW, canvasH);
             ctx.drawImage(img, PAD * scale, PAD * scale, svgW * scale, svgH * scale);
+
+            // Draw actor labels below each task
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const fontSize = 8 * scale;
+            ctx.font = `600 ${fontSize}px "Inter", system-ui, sans-serif`;
+            pdfTasks.forEach((task: any) => {
+              if (!task.actorLabel) return;
+              const cx = (task.x + task.width / 2 - vbX + PAD) * scale;
+              const cy = (task.y + task.height - vbY + PAD) * scale + 3 * scale;
+              const textW = ctx.measureText(task.actorLabel).width;
+              const pillPadX = 6 * scale;
+              const pillH = 14 * scale;
+              const pillW = textW + pillPadX * 2;
+              const r = 3 * scale;
+              const rx = cx - pillW / 2;
+              const ry = cy;
+              ctx.beginPath();
+              ctx.moveTo(rx + r, ry);
+              ctx.lineTo(rx + pillW - r, ry);
+              ctx.quadraticCurveTo(rx + pillW, ry, rx + pillW, ry + r);
+              ctx.lineTo(rx + pillW, ry + pillH - r);
+              ctx.quadraticCurveTo(rx + pillW, ry + pillH, rx + pillW - r, ry + pillH);
+              ctx.lineTo(rx + r, ry + pillH);
+              ctx.quadraticCurveTo(rx, ry + pillH, rx, ry + pillH - r);
+              ctx.lineTo(rx, ry + r);
+              ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+              ctx.closePath();
+              ctx.fillStyle = '#111111';
+              ctx.fill();
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText(task.actorLabel, cx, cy + 2.5 * scale);
+            });
+
             resolve(c.toDataURL('image/png'));
           };
           img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
